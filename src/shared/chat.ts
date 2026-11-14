@@ -84,6 +84,9 @@ export interface StreamDelta {
 
 export interface GraniteBridge {
   platform: string
+  window: {
+    setMinimumSize: (width: number, height: number) => Promise<Result<void>>
+  }
   agents: {
     list: () => Promise<Result<Agent[]>>
     create: (name: string) => Promise<Result<Agent>>

@@ -13,6 +13,9 @@ const ipcRenderer = {
 
 contextBridge.exposeInMainWorld('granite', {
   platform: process.platform,
+  window: {
+    setMinimumSize: (width, height) => ipcRenderer.invoke('window:setMinimumSize', width, height)
+  },
   agents: {
     list: () => ipcRenderer.invoke('agents:list'),
     create: name => ipcRenderer.invoke('agents:create', name),

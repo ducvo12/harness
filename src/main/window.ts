@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { externalWebUrl } from './web-links'
 
 export function createWindow(): void {
+  const workspace = app.commandLine.hasSwitch('workspace')
   const window = new BrowserWindow({
     width: 1120,
     height: 760,
@@ -36,8 +37,10 @@ export function createWindow(): void {
   window.webContents.on('will-navigate', event => event.preventDefault())
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    void window.loadURL(process.env.ELECTRON_RENDERER_URL)
+    const url = new URL(process.env.ELECTRON_RENDERER_URL)
+    if (workspace) url.hash = 'workspace'
+    void window.loadURL(url.href)
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'))
+    void window.loadFile(join(__dirname, '../renderer/index.html'), workspace ? { hash: 'workspace' } : undefined)
   }
 }

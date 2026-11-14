@@ -65,6 +65,20 @@ export function registerIpc(directory: string) {
     }
   }
 
+  // Apply only to the requesting window; account for native frame dimensions.
+  ipcMain.handle('window:setMinimumSize', (event, width, height) => {
+    trusted(event)
+    return safely(async () => {
+      if (![width, height].every(value => Number.isInteger(value) && value > 0 && value < 2 ** 31)) {
+        throw new Error('Invalid window minimum size.')
+      }
+      const window = BrowserWindow.fromWebContents(event.sender)!
+      const outer = window.getBounds()
+      const content = window.getContentBounds()
+      window.setMinimumSize(Math.max(720, width + outer.width - content.width), Math.max(520, height + outer.height - content.height))
+    })
+  })
+
   async function repositoryFolder(agentId: unknown, projectId: unknown) {
     if (typeof agentId !== 'string' || !agentId || agentId.length > 100 || typeof projectId !== 'string' || !projectId || projectId.length > 100) throw new Error('Choose a repository project.')
     const result = await agents.call('organization:get', agentId)
