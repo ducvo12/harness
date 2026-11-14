@@ -480,25 +480,6 @@
   font-size: 15px;
 }
 
-.pane-placeholder {
-  margin: 20px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  opacity: 1;
-  transform: translateY(0);
-  transition:
-    opacity var(--duration-fast) var(--ease-soft),
-    transform var(--duration-fast) var(--ease-soft);
-}
-
-@starting-style {
-  .pane-placeholder {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-}
-
 .pane-tab.is-dragging {
   border: 1px dashed var(--focus);
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
@@ -650,8 +631,7 @@
   .tab-drop-marker,
   .pane-floating,
   .region-floating,
-  .tab-drag-preview,
-  .pane-placeholder {
+  .tab-drag-preview {
     transform: none;
     transition: opacity var(--duration-fast) var(--ease-soft);
   }

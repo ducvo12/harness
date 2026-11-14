@@ -24,6 +24,15 @@ The development command prepares native PTY helpers, opens Electron and serves R
 | `npm run package` | Build and create a local unpacked app in `release/`. |
 | `npm run dist` | Build an installer; public distribution needs platform signing configuration. |
 
+The read-only saved-chat workspace is available with
+`npm run dev -- -- --workspace`. For a compiled build, use
+`npm run preview -- -- --workspace`. Choose an agent in Explorer, then open a
+saved chat. Drag a chat tab into a group body to split it, or into another
+group's tab strip to merge it. The current shell remains the default.
+
+After a build, run `node scripts/verify-saved-chats-desktop.mjs` on macOS to
+check the new workspace against a disposable copy of a seeded profile.
+
 SQLite and PTY native components must match Electron. Installation prepares them; packaged PTY helpers are unpacked through the build configuration. Packaging is not publishing.
 
 The test runner discovers `.test.ts` and `.test.mjs` files recursively under `tests/`.

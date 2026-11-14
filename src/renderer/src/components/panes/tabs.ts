@@ -1,10 +1,12 @@
 import { acceptsTab, paneTypes, tabLabels, type PaneType, type TabType } from './pane-types.ts'
 
-export interface Tab {
-  type: TabType
-  id: string
-  title: string
-}
+export type Tab = { id: string; title: string } & (
+  | { type: 'agent'; agentId?: string }
+  | { type: 'chat'; conversation?: { agentId: string; id: string; path: string[] } }
+  | { type: 'image' | 'file' }
+)
+
+export type NewTab = Omit<Extract<Tab, { type: 'agent' }>, 'id'> | Omit<Extract<Tab, { type: 'chat' }>, 'id'>
 
 export interface PaneTabs {
   paneType: PaneType
@@ -14,20 +16,22 @@ export interface PaneTabs {
 }
 
 // Keep identity separate from the tab's content kind and display label.
-function createTab(paneId: string, number: number, type: TabType): Tab {
-  return { id: `${paneId}-tab-${number}`, title: `${tabLabels[type]} ${number}`, type }
+function createTab(paneId: string, number: number, entry: TabType | NewTab): Tab {
+  const id = `${paneId}-tab-${number}`
+  return typeof entry === 'string' ? { id, title: `${tabLabels[entry]} ${number}`, type: entry } : { ...entry, id }
 }
 
 // Start with the family's default tab kind: Agent for Explorer, Chat for Content.
-export function initialTabs(paneId: string, paneType: PaneType): PaneTabs {
-  const tab = createTab(paneId, 1, paneTypes[paneType].tabs[0])
+export function initialTabs(paneId: string, paneType: PaneType, entry: NewTab | TabType = paneTypes[paneType].tabs[0]): PaneTabs {
+  const tab = createTab(paneId, 1, entry)
   return { paneType, tabs: [tab], activeTabId: tab.id, nextTab: 2 }
 }
 
 // Reject incompatible kinds before changing tabs, selection, or the next number.
-export function addTab<Pane extends PaneTabs & { id: string }>(pane: Pane, type: TabType = paneTypes[pane.paneType].tabs[0]): Pane {
+export function addTab<Pane extends PaneTabs & { id: string }>(pane: Pane, entry: TabType | NewTab = paneTypes[pane.paneType].tabs[0]): Pane {
+  const type = typeof entry === 'string' ? entry : entry.type
   if (!acceptsTab(pane.paneType, type)) return pane
-  const tab = createTab(pane.id, pane.nextTab, type)
+  const tab = createTab(pane.id, pane.nextTab, entry)
   return { ...pane, tabs: [...pane.tabs, tab], activeTabId: tab.id, nextTab: pane.nextTab + 1 }
 }
 

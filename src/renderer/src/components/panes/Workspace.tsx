@@ -12,6 +12,8 @@ export type LayoutUpdate = (current: RegionLayout, nextPane: Pick<PaneNode, 'id'
 
 interface WorkspaceProps {
   layout: RegionLayout
+  renderTab: (tab: Tab) => ReactNode
+  renderEmptyRegion: (type: PaneType) => ReactNode
   onLayoutChange: (layout: LayoutUpdate) => void
   onBoundsChange: (bounds: Rect) => void
   newPane: Pick<PaneNode, 'id' | 'title'>
@@ -72,7 +74,7 @@ function measureSplit(divider: HTMLElement, axis: Resize['axis'], target: Resize
 }
 
 // Share pointer capture and cancellation across region swaps, group docking, and resizing.
-export default function Workspace({ layout, onLayoutChange, onBoundsChange, newPane, workspaceRef: workspace }: WorkspaceProps) {
+export default function Workspace({ layout, renderTab, renderEmptyRegion, onLayoutChange, onBoundsChange, newPane, workspaceRef: workspace }: WorkspaceProps) {
   const [resize, setResize] = useState<Resize | null>(null)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [separated, setSeparated] = useState(false)
@@ -347,6 +349,7 @@ export default function Workspace({ layout, onLayoutChange, onBoundsChange, newP
         <Pane
           key={node.id}
           pane={node}
+          renderTab={renderTab}
           dropEdge={drop?.target?.paneId === node.id ? drop.target.edge : undefined}
           floating={dragging && wholePaneDrag ? floating : undefined}
           hasRegionHandle={path.every(branch => branch === 'first')}
@@ -440,7 +443,7 @@ export default function Workspace({ layout, onLayoutChange, onBoundsChange, newP
           <div className={`pane-layout${frameClass}`} ref={element => { groupSurfaces.current[region.type] = element }}>
             {region.layout ? renderLayout(region.layout, region.type, separating) : (
               <div className="region-empty" style={{ '--vt': `empty-${region.type}` } as CSSProperties}>
-                No open tabs
+                {renderEmptyRegion(region.type)}
               </div>
             )}
           </div>

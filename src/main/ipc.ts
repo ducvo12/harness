@@ -32,11 +32,13 @@ export function registerIpc(directory: string) {
   const modelCatalog = new AccountModelCatalog(chatgpt)
   const apiMetadata = new Map<string, import('../shared/chat').ModelOption[]>()
   const repositoryEditors = new RepositoryEditors(directory)
-  // Start discovery before the window opens. Model pickers and messages share
-  // this request; later messages use the session's cached result.
-  void store.list().then(connections => modelCatalog.warm(connections
-    .filter(connection => connection.provider === 'chatgpt' && connection.accountId)
-    .map(connection => connection.accountId!))).catch(() => {})
+  // The saved-chat workspace only reads local data. The default shell still
+  // shares its eagerly loaded catalog between model pickers and messages.
+  if (!app.commandLine.hasSwitch('workspace')) {
+    void store.list().then(connections => modelCatalog.warm(connections
+      .filter(connection => connection.provider === 'chatgpt' && connection.accountId)
+      .map(connection => connection.accountId!))).catch(() => {})
+  }
   app.on('before-quit', () => chatgpt.cancel())
   const usage = new ConnectionUsageStore()
   const publishUsage = () => {

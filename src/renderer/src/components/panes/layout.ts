@@ -1,5 +1,5 @@
 import { acceptsTab, type PaneType } from './pane-types.ts'
-import { closeTab, initialTabs, type PaneTabs } from './tabs.ts'
+import { closeTab, initialTabs, type NewTab, type PaneTabs } from './tabs.ts'
 
 export type Edge = 'left' | 'right' | 'top' | 'bottom'
 export interface PaneNode extends PaneTabs {
@@ -20,8 +20,8 @@ export const splitSeam = 1
 export const minimumPaneSize = { width: 200, height: 140 }
 
 // Initialize a pane with one selected placeholder tab.
-export function createPane(id: string, title: string, paneType: PaneType = 'content'): PaneNode {
-  return { kind: 'pane', id, title, ...initialTabs(id, paneType) }
+export function createPane(id: string, title: string, paneType: PaneType = 'content', entry?: NewTab): PaneNode {
+  return { kind: 'pane', id, title, ...initialTabs(id, paneType, entry) }
 }
 
 // Find a pane in either branch without depending on its position in the layout.

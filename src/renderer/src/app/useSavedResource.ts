@@ -1,0 +1,22 @@
+import { useEffect, useState } from 'react'
+import type { Result } from '../../../shared/chat'
+
+export function useSavedResource<Value>(load: () => Promise<Result<Value>>, failure: string) {
+  const [attempt, setAttempt] = useState(0)
+  const [snapshot, setSnapshot] = useState<{ load: typeof load; attempt: number; result: Result<Value> }>()
+
+  useEffect(() => {
+    let current = true
+    function publish(result: Result<Value>) {
+      if (current) setSnapshot({ load, attempt, result })
+    }
+
+    void load().then(publish, () => publish({ ok: false, error: failure }))
+    return () => { current = false }
+  }, [load, attempt, failure])
+
+  return {
+    result: snapshot?.load === load && snapshot.attempt === attempt ? snapshot.result : undefined,
+    retry: () => setAttempt(value => value + 1)
+  }
+}

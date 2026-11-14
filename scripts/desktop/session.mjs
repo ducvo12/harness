@@ -194,7 +194,7 @@ export function desktopSession(directory, port, environment = {}, entry = '.', e
       }), 'desktop WebSocket open')
       await wait(
         () => evaluate(options.ready ?? 'document.querySelector(".agent-dropdown-trigger")?.disabled === false'),
-        'desktop shell ready'
+        options.ready ? 'desktop shell ready' : 'agent registry loaded'
       )
     } catch (error) {
       try {
