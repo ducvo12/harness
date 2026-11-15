@@ -7,7 +7,7 @@ import type { Result, SavedConnection, StreamActivity } from '../../../shared/ch
 import type { ApprovalRequest } from '../../../shared/harness'
 import type { Agent, AgentMessage, Conversation } from '../../../shared/agent'
 import { isLiveRun, locksChat, type RecoveryNotice, type RunIntent, type RunSnapshot } from '../../../shared/run'
-import { useConnectionModel } from '../features/chat/useConnectionModel'
+import { chatModelBinding, useConnectionModel } from '../features/chat/useConnectionModel'
 import type { AgentOrganization, ConversationLocation } from '../../../shared/organization'
 
 const bridgeError = 'Could not communicate with the desktop backend.'
@@ -51,11 +51,8 @@ export function useAgentSession() {
   const viewRun = visibleRuns.filter(isLiveRun).at(-1) ?? visibleRuns.at(-1)
   const viewBusy = Boolean(viewRun && isLiveRun(viewRun))
   const busy = runs.some(run => run.agentId === agentId && isLiveRun(run))
-  const locked = messages.find(message => message.model)
-  const connection = connections.find(item => item.id === (locked?.connectionId ?? viewRun?.connectionId ??
-    (locked ? connections.find(item => item.model === locked.model)?.id : undefined) ?? selectedId))
-  const modelSelection = useConnectionModel(connection, locked?.model ?? viewRun?.model, conversationId,
-    [...messages].reverse().find(message => message.model)?.effort)
+  const { connection, model, effort } = chatModelBinding(connections, selectedId, messages, viewRun)
+  const modelSelection = useConnectionModel(connection, model, conversationId, effort)
   const agent = agents.find(item => item.id === agentId)
   const details = viewRun ? runDetails.current.get(viewRun.id) : undefined
   const approval = details?.approval ?? null

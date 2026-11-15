@@ -57,7 +57,7 @@ function Transcript({ transcript, path, readPosition, savePosition }: Pick<Saved
     observer.observe(scroller)
     observer.observe(list)
     return () => observer.disconnect()
-  }, [transcript])
+  }, [])
 
   function rememberPosition() {
     const scroller = viewport.current!
@@ -82,7 +82,7 @@ function Transcript({ transcript, path, readPosition, savePosition }: Pick<Saved
   }
 
   return (
-    <section className="saved-transcript" ref={viewport} onScroll={rememberPosition} tabIndex={0} aria-label="Saved transcript">
+    <section className="saved-transcript" ref={viewport} onScroll={rememberPosition} tabIndex={0} aria-label="Chat transcript">
       <div className="saved-transcript-header">
         <p>{path.join(' / ')}</p>
         <h1>{transcript.title}</h1>

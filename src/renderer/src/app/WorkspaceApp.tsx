@@ -2,17 +2,20 @@ import '../styles/shell.css'
 import '../styles/panes.css'
 import '../styles/saved-chats.css'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Agent, Conversation, ConversationDetail } from '../../../shared/agent'
-import type { Result } from '../../../shared/chat'
+import type { Agent, Conversation } from '../../../shared/agent'
+import type { SavedConnection } from '../../../shared/chat'
 import Header from '../components/Header'
 import Workspace, { type LayoutUpdate } from '../components/panes/Workspace'
 import { createPane, findPane, updatePane, type Rect } from '../components/panes/layout'
 import { initialRegions, regionsMinimum, updateRegion, type RegionLayout } from '../components/panes/regions'
 import type { Tab } from '../components/panes/tabs'
 import AgentExplorer, { AgentPicker } from '../features/organization/AgentExplorer'
-import SavedTranscript, { type ReadingPosition } from '../features/chat/SavedTranscript'
+import type { ReadingPosition } from '../features/chat/SavedTranscript'
+import WorkspaceChat, { type ComposerDraft } from '../features/chat/WorkspaceChat'
+import Settings from '../features/connections/Settings'
 import { findTab, openSavedChat } from './saved-chat-layout'
 import { useSavedResource } from './useSavedResource'
+import { chatKey, useWorkspaceChats } from './useWorkspaceChats'
 
 interface WorkspaceState {
   layout: RegionLayout
@@ -35,9 +38,11 @@ function loadAgents() {
   return window.granite.agents.list()
 }
 
-function conversationKey(agentId: string, chatId: string) {
-  return JSON.stringify([agentId, chatId])
+function loadConnections() {
+  return window.granite.connections.list()
 }
+
+const emptyDraft: ComposerDraft = { text: '', attachments: [] }
 
 export default function WorkspaceApp() {
   const [state, setState] = useState<WorkspaceState>(() => ({
@@ -48,9 +53,18 @@ export default function WorkspaceApp() {
   const [windowError, setWindowError] = useState('')
   const workspace = useRef<HTMLElement>(null)
   const positions = useRef(new Map<string, ReadingPosition>())
-  const requests = useRef(new Map<string, Promise<Result<ConversationDetail>>>())
-  const [transcripts, setTranscripts] = useState(() => new Map<string, Result<ConversationDetail>>())
+  const [drafts, setDrafts] = useState(new Map<string, ComposerDraft>())
+  const [selectedConnection, setSelectedConnection] = useState(() => localStorage.getItem('granite.connection') ?? '')
+  const [editedConnections, setEditedConnections] = useState<SavedConnection[]>()
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settings = useRef<HTMLDialogElement>(null)
+  const chatSession = useWorkspaceChats()
   const { result: agents, retry: retryAgents } = useSavedResource(loadAgents, 'Could not load your agents.')
+  const { result: savedConnections, retry: retryConnections } = useSavedResource(loadConnections, 'Could not load your connections.')
+  const connections = editedConnections ? { ok: true as const, value: editedConnections } : savedConnections
+  const defaultConnection = connections?.ok
+    ? (connections.value.find(item => item.id === selectedConnection) ?? connections.value[0])?.id ?? ''
+    : ''
   const { layout, focus } = state
   const measured = bounds.width > 0 && bounds.height > 0
   const minimum = regionsMinimum(layout)
@@ -71,44 +85,40 @@ export default function WorkspaceApp() {
     tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [focus])
 
+  useLayoutEffect(() => {
+    if (settingsOpen) settings.current?.showModal()
+  }, [settingsOpen])
+
   useEffect(() => {
     const content = layout.regions.find(region => region.type === 'content')!.layout
     for (const viewId of positions.current.keys()) {
       if (!findTab(content, tab => tab.id === viewId)) positions.current.delete(viewId)
     }
-    const stillOpen = (key: string) => findTab(content, tab => tab.type === 'chat' && tab.conversation !== undefined &&
-      conversationKey(tab.conversation.agentId, tab.conversation.id) === key)
-    const closed = [...requests.current.keys()].filter(key => !stillOpen(key))
-    if (closed.length) {
-      for (const key of closed) requests.current.delete(key)
-      setTranscripts(current => {
-        const remaining = new Map(current)
-        for (const key of closed) remaining.delete(key)
-        return remaining
-      })
-    }
+    setDrafts(current => {
+      const open = [...current].filter(([viewId]) => findTab(content, tab => tab.id === viewId))
+      return open.length === current.size ? current : new Map(open)
+    })
   }, [layout])
 
-  function loadChat(agentId: string, chatId: string, retry = false) {
-    const key = conversationKey(agentId, chatId)
-    if (retry) {
-      requests.current.delete(key)
-      setTranscripts(current => {
-        const pending = new Map(current)
-        pending.delete(key)
-        return pending
-      })
-    }
-    if (requests.current.has(key)) return
+  useEffect(() => {
+    const content = layout.regions.find(region => region.type === 'content')!.layout
+    chatSession.prune(key => Boolean(findTab(content, tab =>
+      tab.type === 'chat' && tab.conversation !== undefined && chatKey(tab.conversation) === key
+    )))
+  }, [layout, chatSession.chats])
 
-    const request = window.granite.conversations.get(agentId, chatId)
-    requests.current.set(key, request)
-    function publish(result: Result<ConversationDetail>) {
-      if (requests.current.get(key) === request) {
-        setTranscripts(current => new Map(current).set(key, result))
-      }
-    }
-    void request.then(publish, () => publish({ ok: false, error: 'Could not load this conversation.' }))
+  function selectConnection(id: string) {
+    setSelectedConnection(id)
+    localStorage.setItem('granite.connection', id)
+  }
+
+  function clearDraft(id: string) {
+    setDrafts(current => {
+      if (!current.has(id)) return current
+      const remaining = new Map(current)
+      remaining.delete(id)
+      return remaining
+    })
   }
 
   function changeLayout(update: LayoutUpdate) {
@@ -120,7 +130,7 @@ export default function WorkspaceApp() {
       const opened = openSavedChat(current.layout, nextGroup(current), chat, path)
       return { ...withLayout(current, opened.layout), focus: { tabId: opened.tabId } }
     })
-    loadChat(chat.agentId, chat.id)
+    chatSession.load(chat)
   }
 
   function chooseAgent(agent: Agent, pickerId?: string) {
@@ -162,13 +172,28 @@ export default function WorkspaceApp() {
   function renderTab(tab: Tab) {
     if (tab.type === 'agent') return renderExplorer(tab.agentId, tab.id)
     if (tab.type === 'chat' && tab.conversation) {
-      const { agentId, id, path } = tab.conversation
+      const conversation = tab.conversation
+      const key = chatKey(conversation)
+      const agent = agents?.ok ? agents.value.find(item => item.id === conversation.agentId) : undefined
       return (
-        <SavedTranscript
+        <WorkspaceChat
           key={tab.id}
-          path={path}
-          result={transcripts.get(conversationKey(agentId, id))}
-          retry={() => loadChat(agentId, id, true)}
+          conversationId={conversation.id}
+          agent={agent}
+          path={conversation.path}
+          chat={chatSession.chats.get(key)}
+          connections={connections}
+          selectedConnection={defaultConnection}
+          draft={drafts.get(tab.id) ?? emptyDraft}
+          onDraftChange={change => setDrafts(current => new Map(current).set(tab.id, { ...(current.get(tab.id) ?? emptyDraft), ...change }))}
+          onDraftAccepted={() => clearDraft(tab.id)}
+          onSelectConnection={selectConnection}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onRetryConnections={retryConnections}
+          onSubmit={(connection, model, effort, text, intent, accepted) =>
+            chatSession.submit(conversation, connection, model, effort, text, intent, accepted)}
+          onError={error => chatSession.setError(key, error)}
+          onReload={() => chatSession.load(conversation, true)}
           readPosition={() => positions.current.get(tab.id)}
           savePosition={position => positions.current.set(tab.id, position)}
         />
@@ -192,6 +217,16 @@ export default function WorkspaceApp() {
         newPane={nextGroup(state)}
         workspaceRef={workspace}
       />
+
+      {settingsOpen && connections?.ok && (
+        <dialog className="workspace-connections" aria-label="Connections" ref={settings} onClose={() => setSettingsOpen(false)}>
+          <button type="button" className="quiet-button" onClick={() => settings.current?.close()}>
+            Close settings
+          </button>
+
+          <Settings connections={connections.value} onChange={setEditedConnections} />
+        </dialog>
+      )}
     </div>
   )
 }

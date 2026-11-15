@@ -58,3 +58,37 @@
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
+
+.workspace-chat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-chat > .pane-message,
+.workspace-chat > .saved-transcript {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 3rem;
+}
+
+.workspace-chat .composer-area {
+  flex: none;
+  padding: 0 8px 8px;
+}
+
+.workspace-chat .activity-section-content {
+  max-height: 8rem;
+  overflow: auto;
+}
+
+.workspace-connections {
+  width: min(48rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pane);
+  background: var(--surface);
+  color: var(--text);
+}

@@ -77,12 +77,19 @@ arguments through npm, the second forwards them through electron-vite, and
 The milestone passed lint, both type checks, all 275 tests, and a fresh build.
 On macOS, the desktop check launched both shells and verified opening,
 focusing, splitting, merging, and reopening chats on a disposable copy of a
-seeded profile, with zero requests to the simulated model provider. Run
-`node scripts/verify-saved-chats-desktop.mjs` after a build to repeat the check.
+seeded profile.
+
+Existing saved chats now use the shared composer. They can send messages,
+display live replies, stop runs, and answer agent questions above the message
+box. Switching or docking tabs preserves unsent drafts. Closing a tab ends
+its view while the run continues, and reopening the chat shows the current
+reply. The desktop check also exercises these flows with a local simulated
+provider and verifies that browsing saved chats does not prompt the model.
+Run `node scripts/verify-saved-chats-desktop.mjs` after a build.
 
 ### Before merging to main
 
-The next milestone is the composer and live runs. Layout persistence follows.
+The next milestone is creating a chat from Explorer. Layout persistence follows.
 Before merging and making the workspace the default shell, verify all four:
 
 1. **Existing profiles.** Use a disposable copy of an existing Granite profile.
