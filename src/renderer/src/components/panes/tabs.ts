@@ -1,8 +1,13 @@
 import { acceptsTab, paneTypes, tabLabels, type PaneType, type TabType } from './pane-types.ts'
+import type { ConversationLocation } from '../../../../shared/organization.ts'
+
+type ChatPath = { agentId: string; path: string[] }
+export type DraftChatDestination = ChatPath & { id?: never; location: ConversationLocation }
+type ChatDestination = (ChatPath & { id: string; location?: never }) | DraftChatDestination
 
 export type Tab = { id: string; title: string } & (
   | { type: 'agent'; agentId?: string }
-  | { type: 'chat'; conversation?: { agentId: string; id: string; path: string[] } }
+  | { type: 'chat'; conversation?: ChatDestination }
   | { type: 'image' | 'file' }
 )
 

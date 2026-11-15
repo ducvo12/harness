@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Result } from '../../../shared/chat'
 
-export function useSavedResource<Value>(load: () => Promise<Result<Value>>, failure: string) {
+export function useSavedResource<Value>(load: () => Promise<Result<Value>>, failure: string, revision = 0) {
   const [attempt, setAttempt] = useState(0)
   const [snapshot, setSnapshot] = useState<{ load: typeof load; attempt: number; result: Result<Value> }>()
 
@@ -13,7 +13,7 @@ export function useSavedResource<Value>(load: () => Promise<Result<Value>>, fail
 
     void load().then(publish, () => publish({ ok: false, error: failure }))
     return () => { current = false }
-  }, [load, attempt, failure])
+  }, [load, attempt, failure, revision])
 
   return {
     result: snapshot?.load === load && snapshot.attempt === attempt ? snapshot.result : undefined,

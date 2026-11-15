@@ -10,6 +10,10 @@
   cursor: pointer;
 }
 
+.agent-tree-new-chat {
+  float: inline-end;
+}
+
 .agent-explorer .tree-entry {
   font-family: var(--font-sans);
   border-radius: var(--radius-sm);

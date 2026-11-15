@@ -3,6 +3,8 @@ import type { Agent, Conversation } from '../../../../shared/agent'
 import type { Project, Section } from '../../../../shared/organization'
 import { defaultTreeSort, sortTreeEntries } from '../../app/tree-sort'
 import { useSavedResource } from '../../app/useSavedResource'
+import type { DraftChatDestination } from '../../components/panes/tabs'
+import TreeActionIcon from '../../components/TreeActionIcon'
 
 export function AgentPicker({ agents, onChoose }: { agents: Agent[]; onChoose: (agent: Agent) => void }) {
   return (
@@ -20,10 +22,12 @@ export function AgentPicker({ agents, onChoose }: { agents: Agent[]; onChoose: (
 
 interface AgentExplorerProps {
   agent: Agent
+  chatRevision: number
   onOpenChat: (chat: Conversation, path: string[]) => void
+  onNewChat: (destination: DraftChatDestination) => void
 }
 
-export default function AgentExplorer({ agent, onOpenChat }: AgentExplorerProps) {
+export default function AgentExplorer({ agent, chatRevision, onOpenChat, onNewChat }: AgentExplorerProps) {
   const agentId = agent.id
   const load = useCallback(async () => {
     const [organization, conversations] = await Promise.all([
@@ -34,7 +38,7 @@ export default function AgentExplorer({ agent, onOpenChat }: AgentExplorerProps)
     if (!conversations.ok) return conversations
     return { ok: true as const, value: { ...organization.value, chats: conversations.value } }
   }, [agentId])
-  const { result, retry } = useSavedResource(load, 'Could not load this agent’s chats.')
+  const { result, retry } = useSavedResource(load, 'Could not load this agent’s chats.', chatRevision)
 
   if (!result) return <p className="pane-message" role="status">Loading chats…</p>
   if (!result.ok) return (
@@ -45,6 +49,7 @@ export default function AgentExplorer({ agent, onOpenChat }: AgentExplorerProps)
   )
 
   const { sections, projects, chats } = result.value
+  const general = sections.find(section => section.kind === 'general')
   const sort = <T extends Conversation | Project | Section>(entries: T[]) =>
     sortTreeEntries(entries, chats, defaultTreeSort)
 
@@ -56,8 +61,34 @@ export default function AgentExplorer({ agent, onOpenChat }: AgentExplorerProps)
     )
   }
 
+  function startChat(section: Section, project?: Project) {
+    const path = [agent.name, section.name]
+    if (project) path.push(project.name)
+    onNewChat({ agentId, path, location: { sectionId: section.id, projectId: project?.id ?? null } })
+  }
+
+  function newChatAction(section: Section, project?: Project) {
+    const label = `New chat in ${project?.name ?? section.name}`
+    return (
+      <button type="button" className="agent-tree-new-chat tree-action" title={label} aria-label={label} onClick={event => {
+        event.preventDefault()
+        const folder = event.currentTarget.closest('details')
+        if (folder) folder.open = true
+        startChat(section, project)
+      }}>
+        <TreeActionIcon plus />
+      </button>
+    )
+  }
+
   return (
     <div className="agent-explorer">
+      {general && (
+        <button type="button" className="new-chat-button quiet-button" aria-label="New chat" title="New chat in General" onClick={() => startChat(general)}>
+          <span aria-hidden="true">+</span>New chat
+        </button>
+      )}
+
       {!sections.length && <p className="tree-empty">No saved sections.</p>}
 
       {sort(sections).map(section => {
@@ -68,7 +99,10 @@ export default function AgentExplorer({ agent, onOpenChat }: AgentExplorerProps)
 
         return (
           <details key={section.id} open>
-            <summary>{section.name}</summary>
+            <summary>
+              {section.name}
+              {section.kind !== 'general' && newChatAction(section)}
+            </summary>
 
             <div className="agent-tree-children">
               {!children.length && <p className="tree-empty">No saved chats.</p>}
@@ -78,7 +112,10 @@ export default function AgentExplorer({ agent, onOpenChat }: AgentExplorerProps)
                 const projectChats = sort(chats.filter(chat => chat.projectId === child.id))
                 return (
                   <details key={child.id}>
-                    <summary>{child.name}</summary>
+                    <summary>
+                      {child.name}
+                      {newChatAction(section, child)}
+                    </summary>
 
                     <div className="agent-tree-children">
                       {!projectChats.length && <p className="tree-empty">No saved chats.</p>}

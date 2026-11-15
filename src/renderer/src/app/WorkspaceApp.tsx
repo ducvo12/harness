@@ -2,26 +2,28 @@ import '../styles/shell.css'
 import '../styles/panes.css'
 import '../styles/saved-chats.css'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Agent, Conversation } from '../../../shared/agent'
+import type { Agent, Conversation, ConversationDetail } from '../../../shared/agent'
 import type { SavedConnection } from '../../../shared/chat'
 import Header from '../components/Header'
 import Workspace, { type LayoutUpdate } from '../components/panes/Workspace'
 import { createPane, findPane, updatePane, type Rect } from '../components/panes/layout'
 import { initialRegions, regionsMinimum, updateRegion, type RegionLayout } from '../components/panes/regions'
-import type { Tab } from '../components/panes/tabs'
+import type { DraftChatDestination, Tab } from '../components/panes/tabs'
 import AgentExplorer, { AgentPicker } from '../features/organization/AgentExplorer'
 import type { ReadingPosition } from '../features/chat/SavedTranscript'
 import WorkspaceChat, { type ComposerDraft } from '../features/chat/WorkspaceChat'
 import Settings from '../features/connections/Settings'
-import { findTab, openSavedChat } from './saved-chat-layout'
+import { findTab, openDraftChat, openSavedChat, updateChatTab } from './saved-chat-layout'
 import { useSavedResource } from './useSavedResource'
-import { chatKey, useWorkspaceChats } from './useWorkspaceChats'
+import { chatKey, useWorkspaceChats, type ChatIdentity } from './useWorkspaceChats'
 
 interface WorkspaceState {
   layout: RegionLayout
   nextPane: number
-  focus?: { tabId: string }
+  focus?: { tabId: string; composer?: boolean }
 }
+
+type DraftState = ComposerDraft & { creating?: boolean; error?: string }
 
 function nextGroup({ nextPane }: WorkspaceState) {
   return { id: `pane-${nextPane}`, title: `Group ${nextPane}` }
@@ -42,7 +44,7 @@ function loadConnections() {
   return window.granite.connections.list()
 }
 
-const emptyDraft: ComposerDraft = { text: '', attachments: [] }
+const emptyDraft: DraftState = { text: '', attachments: [] }
 
 export default function WorkspaceApp() {
   const [state, setState] = useState<WorkspaceState>(() => ({
@@ -53,7 +55,9 @@ export default function WorkspaceApp() {
   const [windowError, setWindowError] = useState('')
   const workspace = useRef<HTMLElement>(null)
   const positions = useRef(new Map<string, ReadingPosition>())
-  const [drafts, setDrafts] = useState(new Map<string, ComposerDraft>())
+  const [drafts, setDrafts] = useState(new Map<string, DraftState>())
+  const creatingDrafts = useRef(new Set<string>())
+  const [chatRevisions, setChatRevisions] = useState(new Map<string, number>())
   const [selectedConnection, setSelectedConnection] = useState(() => localStorage.getItem('granite.connection') ?? '')
   const [editedConnections, setEditedConnections] = useState<SavedConnection[]>()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -81,8 +85,13 @@ export default function WorkspaceApp() {
   useLayoutEffect(() => {
     if (!focus) return
     const tab = document.getElementById(focus.tabId)
-    tab?.focus({ preventScroll: true })
-    tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    if (!tab) return
+    tab.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    const input = focus.composer
+      ? document.getElementById(tab.getAttribute('aria-controls')!)?.querySelector('textarea')
+      : undefined
+    const target = input && !input.disabled ? input : tab
+    target.focus({ preventScroll: true })
   }, [focus])
 
   useLayoutEffect(() => {
@@ -103,7 +112,7 @@ export default function WorkspaceApp() {
   useEffect(() => {
     const content = layout.regions.find(region => region.type === 'content')!.layout
     chatSession.prune(key => Boolean(findTab(content, tab =>
-      tab.type === 'chat' && tab.conversation !== undefined && chatKey(tab.conversation) === key
+      tab.type === 'chat' && tab.conversation?.id !== undefined && chatKey(tab.conversation) === key
     )))
   }, [layout, chatSession.chats])
 
@@ -121,6 +130,14 @@ export default function WorkspaceApp() {
     })
   }
 
+  function patchDraft(id: string, change: Partial<DraftState>) {
+    setDrafts(current => new Map(current).set(id, { ...(current.get(id) ?? emptyDraft), ...change }))
+  }
+
+  function refreshExplorer(agentId: string) {
+    setChatRevisions(current => new Map(current).set(agentId, (current.get(agentId) ?? 0) + 1))
+  }
+
   function changeLayout(update: LayoutUpdate) {
     setState(current => withLayout(current, update(current.layout, nextGroup(current))))
   }
@@ -131,6 +148,58 @@ export default function WorkspaceApp() {
       return { ...withLayout(current, opened.layout), focus: { tabId: opened.tabId } }
     })
     chatSession.load(chat)
+  }
+
+  function newChat(destination: DraftChatDestination) {
+    setState(current => {
+      const opened = openDraftChat(current.layout, nextGroup(current), destination)
+      return { ...withLayout(current, opened.layout), focus: { tabId: opened.tabId, composer: true } }
+    })
+  }
+
+  async function saveDraft(tabId: string, destination: DraftChatDestination): Promise<ConversationDetail | undefined> {
+    if (creatingDrafts.current.has(tabId)) return
+    creatingDrafts.current.add(tabId)
+    patchDraft(tabId, { creating: true, error: '' })
+
+    let error = ''
+    try {
+      const result = await window.granite.conversations.create(destination.agentId, destination.location)
+      if (!result.ok) {
+        error = result.error
+        return
+      }
+
+      const { agentId, id, title } = result.value
+      setState(current => withLayout(current, updateChatTab(current.layout, tab => tab.id === tabId, tab => ({
+        ...tab,
+        title,
+        conversation: { agentId, id, path: destination.path }
+      }))))
+      refreshExplorer(agentId)
+      return result.value
+    } catch {
+      error = 'Could not create this chat.'
+    } finally {
+      creatingDrafts.current.delete(tabId)
+      setDrafts(current => {
+        const draft = current.get(tabId)
+        return draft ? new Map(current).set(tabId, { ...draft, creating: false, error }) : current
+      })
+    }
+  }
+
+  async function refreshNewChat(identity: ChatIdentity) {
+    refreshExplorer(identity.agentId)
+    const result = await window.granite.conversations.get(identity.agentId, identity.id).catch(() => undefined)
+    // A metadata refresh can fail while the transcript is still streaming.
+    if (!result?.ok) return
+    const { title } = result.value
+    chatSession.updateTitle(identity, title)
+    setState(current => withLayout(current, updateChatTab(current.layout,
+      tab => tab.conversation?.id === identity.id && tab.conversation.agentId === identity.agentId && tab.title !== title,
+      tab => ({ ...tab, title })
+    )))
   }
 
   function chooseAgent(agent: Agent, pickerId?: string) {
@@ -165,7 +234,7 @@ export default function WorkspaceApp() {
     )
     const agent = agents.value.find(item => item.id === agentId)
     return agent
-      ? <AgentExplorer key={pickerId} agent={agent} onOpenChat={openChat} />
+      ? <AgentExplorer key={pickerId} agent={agent} chatRevision={chatRevisions.get(agent.id) ?? 0} onOpenChat={openChat} onNewChat={newChat} />
       : <AgentPicker key={pickerId} agents={agents.value} onChoose={chosen => chooseAgent(chosen, pickerId)} />
   }
 
@@ -173,7 +242,10 @@ export default function WorkspaceApp() {
     if (tab.type === 'agent') return renderExplorer(tab.agentId, tab.id)
     if (tab.type === 'chat' && tab.conversation) {
       const conversation = tab.conversation
-      const key = chatKey(conversation)
+      const key = conversation.id !== undefined ? chatKey(conversation) : undefined
+      const draft = drafts.get(tab.id) ?? emptyDraft
+      const chat = key ? chatSession.chats.get(key) : { submitting: draft.creating, error: draft.error }
+      const hasMessages = chat?.messages?.length ?? (chat?.result?.ok ? chat.result.value.messages.length : 0)
       const agent = agents?.ok ? agents.value.find(item => item.id === conversation.agentId) : undefined
       return (
         <WorkspaceChat
@@ -181,19 +253,34 @@ export default function WorkspaceApp() {
           conversationId={conversation.id}
           agent={agent}
           path={conversation.path}
-          chat={chatSession.chats.get(key)}
+          chat={chat}
           connections={connections}
           selectedConnection={defaultConnection}
-          draft={drafts.get(tab.id) ?? emptyDraft}
-          onDraftChange={change => setDrafts(current => new Map(current).set(tab.id, { ...(current.get(tab.id) ?? emptyDraft), ...change }))}
+          draft={draft}
+          onDraftChange={change => patchDraft(tab.id, change)}
           onDraftAccepted={() => clearDraft(tab.id)}
           onSelectConnection={selectConnection}
           onOpenSettings={() => setSettingsOpen(true)}
           onRetryConnections={retryConnections}
-          onSubmit={(connection, model, effort, text, intent, accepted) =>
-            chatSession.submit(conversation, connection, model, effort, text, intent, accepted)}
-          onError={error => chatSession.setError(key, error)}
-          onReload={() => chatSession.load(conversation, true)}
+          onSubmit={async (connection, model, effort, text, intent, accepted) => {
+            let saved: ChatIdentity
+            if (conversation.id !== undefined) {
+              saved = conversation
+            } else {
+              const created = await saveDraft(tab.id, conversation)
+              if (!created) return
+              chatSession.remember(created)
+              saved = created
+            }
+            await chatSession.submit(saved, connection, model, effort, text, intent, () => {
+              accepted()
+              if (intent === 'message' && !hasMessages) void refreshNewChat(saved)
+            })
+          }}
+          onError={error => key ? chatSession.setError(key, error) : patchDraft(tab.id, { error })}
+          onReload={() => {
+            if (conversation.id !== undefined) chatSession.load(conversation, true)
+          }}
           readPosition={() => positions.current.get(tab.id)}
           savePosition={position => positions.current.set(tab.id, position)}
         />
@@ -211,7 +298,7 @@ export default function WorkspaceApp() {
       <Workspace
         layout={layout}
         renderTab={renderTab}
-        renderEmptyRegion={type => type === 'explorer' ? renderExplorer() : <p>Open a saved chat from Explorer.</p>}
+        renderEmptyRegion={type => type === 'explorer' ? renderExplorer() : <p>Open or start a chat from Explorer.</p>}
         onLayoutChange={changeLayout}
         onBoundsChange={setBounds}
         newPane={nextGroup(state)}

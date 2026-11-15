@@ -131,6 +131,19 @@ export function useWorkspaceChats() {
     void request.then(publish, () => publish({ ok: false, error: 'Could not load this conversation.' }))
   }
 
+  function remember(conversation: ConversationDetail) {
+    update(chatKey(conversation), chat => ({ ...chat, result: { ok: true, value: conversation } }))
+  }
+
+  function updateTitle(identity: ChatIdentity, title: string) {
+    const key = chatKey(identity)
+    setChats(current => {
+      const chat = current.get(key)
+      if (!chat?.result?.ok || chat.result.value.title === title) return current
+      return new Map(current).set(key, { ...chat, result: { ok: true, value: { ...chat.result.value, title } } })
+    })
+  }
+
   function prune(isOpen: (key: string) => boolean) {
     const closed = [...chats].filter(([key, chat]) =>
       !isOpen(key) && !chat.submitting && !(chat.run && isLiveRun(chat.run))
@@ -205,5 +218,5 @@ export function useWorkspaceChats() {
     }
   }
 
-  return { chats, load, prune, submit, setError }
+  return { chats, load, remember, updateTitle, prune, submit, setError }
 }

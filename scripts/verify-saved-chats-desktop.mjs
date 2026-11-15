@@ -33,6 +33,11 @@ const provider = createServer(async (request, response) => {
     streamEvent(response, { content: 'Partial saved-chat reply' })
     return
   }
+  if (prompt === 'Start a General chat') {
+    held = response
+    streamEvent(response, { content: 'Reply in the new General chat' })
+    return
+  }
   if (prompt === 'Ask me a question') {
     streamEvent(response, { tool_calls: [{
       index: 0, id: 'workspace-question', type: 'function',
@@ -40,7 +45,7 @@ const provider = createServer(async (request, response) => {
     }] })
     streamEvent(response, {}, 'tool_calls')
   } else {
-    streamEvent(response, { content: 'Thanks for naming the project.' })
+    streamEvent(response, { content: prompt === 'Start a project chat' ? 'Reply in the new project chat' : 'Thanks for naming the project.' })
     streamEvent(response, {}, 'stop')
   }
   response.end('data: [DONE]\n\n')
@@ -176,6 +181,9 @@ try {
 
   const closeChat = title => evaluate(`[...document.querySelectorAll('.tab-close')]
     .find(button => button.ariaLabel.startsWith(${JSON.stringify('Close ' + title + ' in ')})).click()`)
+  const activeTabId = () => evaluate(`document.querySelector(${JSON.stringify(content + ' [role=tab][aria-selected=true]')})?.id`)
+  const closeTab = id => evaluate(`document.getElementById(${JSON.stringify(id)}).closest('.pane-tab').querySelector('.tab-close').click()`)
+  const header = () => evaluate('document.querySelector(".saved-transcript-header")?.textContent')
 
   try {
     await desktop.launch()
@@ -298,10 +306,92 @@ try {
       exitProgress = await closeAndMeasureFade()
     }
     assert.equal(exitProgress, 1, 'the final chat pane holds its faded-out state after the exit animation')
+    await wait(() => evaluate('!document.querySelector(".workspace[data-transition]")'), 'final fade settles')
+    await click('Archive')
+    await wait(() => evaluate('Boolean(document.querySelector(".tree-entry[title=\'Long saved chat\']"))'), 'Archive tree ready')
+    const agentId = await evaluate(`(async () => {
+      const agents = await window.granite.agents.list()
+      if (!agents.ok) throw new Error(agents.error)
+      return agents.value.find(agent => agent.name === 'Archive').id
+    })()`)
+    const organization = await evaluate(`window.granite.organization.get(${JSON.stringify(agentId)})`)
+    assert.equal(organization.ok, true)
+    const general = organization.value.sections.find(section => section.kind === 'general')
+    const empty = organization.value.sections.find(section => section.name === 'Empty section')
+    const release = organization.value.projects.find(project => project.name === 'Release')
+    const savedChats = async () => {
+      const result = await evaluate(`window.granite.conversations.list(${JSON.stringify(agentId)})`)
+      assert.equal(result.ok, true)
+      return result.value
+    }
+    const savedCount = (await savedChats()).length
+
+    await click('New chat')
+    const generalTab = await activeTabId()
+    assert.match(await header(), /Archive \/ General.*New chat/)
+    assert.equal(await evaluate('document.activeElement.getAttribute("aria-label")'), 'Message')
+    await fill(composer, 'Start a General chat', 'textarea')
+    await click('New chat in Empty section')
+    const sectionTab = await activeTabId()
+    assert.notEqual(sectionTab, generalTab)
+    assert.match(await header(), /Archive \/ Empty section.*New chat/)
+    assert.equal(await draft(), '')
+    await fill(composer, 'Keep this draft on failure', 'textarea')
+    assert.equal((await savedChats()).length, savedCount)
+
+    const deleted = await evaluate(`window.granite.organization.deleteSection(${JSON.stringify(agentId)}, ${JSON.stringify(empty.id)})`)
+    assert.equal(deleted.ok, true)
+    await click('Send message')
+    await wait(() => evaluate('Boolean(document.querySelector(".workspace-chat [role=alert]"))'), 'deleted destination is reported')
+    assert.equal(await draft(), 'Keep this draft on failure')
+    await closeTab(sectionTab)
+    await wait(async () => await tabCount() === 1, 'unsaved tab closes')
+    assert.equal(await activeTabId(), generalTab)
+    assert.equal(await draft(), 'Start a General chat')
+    assert.equal((await savedChats()).length, savedCount)
+    assert.equal(prompts.length, 3)
+
+    await click('Send message')
+    await wait(() => transcriptContains('Reply in the new General chat'), 'first General message streams')
+    await wait(() => evaluate('Boolean(document.querySelector(".tree-entry[title=\'Start a General chat\']"))'), 'new General chat appears in Explorer')
+    assert.equal(await activeTabId(), generalTab)
+    const savedGeneral = (await savedChats()).find(chat => chat.title === 'Start a General chat')
+    assert.equal(savedGeneral.sectionId, general.id)
+    assert.equal(savedGeneral.projectId, null)
+
+    await evaluate(`[...document.querySelectorAll('summary')].find(summary => summary.textContent.trim() === 'Release').click()`)
+    await click('New chat in Release')
+    const projectTab = await activeTabId()
+    assert.match(await header(), /Archive \/ Planning \/ Release.*New chat/)
+    await fill(composer, 'Start a project chat', 'textarea')
+    await evaluate(`(() => {
+      const send = document.querySelector('.composer button[type=submit]')
+      send.click()
+      send.click()
+    })()`)
+    await wait(async () => (await savedChats()).some(chat => chat.title === 'Start a project chat'), 'project message is accepted while General streams')
+    const newChats = await savedChats()
+    const savedProject = newChats.find(chat => chat.title === 'Start a project chat')
+    assert.equal(newChats.length, savedCount + 2)
+    assert.equal(savedProject.sectionId, release.sectionId)
+    assert.equal(savedProject.projectId, release.id)
+
+    await click('Start a General chat')
+    await click('■ Stop')
+    await wait(() => evaluate('Boolean(document.querySelector(".tree-entry[title=\'Start a project chat\']"))'), 'new project chat appears in Explorer')
+    await click('Start a project chat')
+    await wait(() => transcriptContains('Reply in the new project chat'), 'project reply arrives')
+    assert.equal(await activeTabId(), projectTab)
+    await closeTab(projectTab)
+    await wait(async () => await tabCount() === 1, 'new saved project tab closes')
+    await click('Start a project chat')
+    await wait(() => transcriptContains('Reply in the new project chat'), 'new project chat reopens from storage')
+    assert.notEqual(await activeTabId(), projectTab)
+    assert.deepEqual(prompts.slice(3), ['Start a General chat', 'Start a project chat'])
   } finally {
     await desktop.quit()
   }
-  console.log('Both shells launched. The final chat pane held its faded-out state.')
+  console.log('Both shells launched. The final chat pane held its fade. Explorer drafts, first sends, and reopening newly saved chats passed.')
 } finally {
   provider.closeAllConnections()
   provider.close()

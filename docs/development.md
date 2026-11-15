@@ -85,11 +85,17 @@ box. Switching or docking tabs preserves unsent drafts. Closing a tab ends
 its view while the run continues, and reopening the chat shows the current
 reply. The desktop check also exercises these flows with a local simulated
 provider and verifies that browsing saved chats does not prompt the model.
+
+**New chat** in Explorer opens a draft in the selected agent's General
+section. Section and project controls open drafts at their own locations.
+The first send saves the chat in that location and keeps the same tab.
+Closing a draft before sending leaves no saved chat.
+
 Run `node scripts/verify-saved-chats-desktop.mjs` after a build.
 
 ### Before merging to main
 
-The next milestone is creating a chat from Explorer. Layout persistence follows.
+The next milestone is layout persistence.
 Before merging and making the workspace the default shell, verify all four:
 
 1. **Existing profiles.** Use a disposable copy of an existing Granite profile.

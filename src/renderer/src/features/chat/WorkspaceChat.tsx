@@ -19,7 +19,7 @@ export interface ComposerDraft {
 interface WorkspaceChatProps {
   chat?: WorkspaceChatState
   agent?: Agent
-  conversationId: string
+  conversationId?: string
   path: string[]
   connections?: Result<SavedConnection[]>
   selectedConnection: string
@@ -51,7 +51,7 @@ export default function WorkspaceChat({
   const savedConnections = connections?.ok ? connections.value : noConnections
   const { connection, model, effort } = chatModelBinding(savedConnections, selectedConnection, messages, run)
   const modelSelection = useConnectionModel(connection, model, conversationId, effort)
-  const loaded = Boolean(result?.ok && connections?.ok)
+  const loaded = (!conversationId || result?.ok === true) && connections?.ok === true
   const transcript = result?.ok ? { ok: true as const, value: { ...result.value, messages } } : result
 
   async function send(intent: RunIntent) {
@@ -93,13 +93,13 @@ export default function WorkspaceChat({
   const question = run?.question
   return (
     <div className="workspace-chat">
-      <SavedTranscript result={transcript} path={path} retry={onReload} readPosition={readPosition} savePosition={savePosition} />
+      <SavedTranscript draft={!conversationId} result={transcript} path={path} retry={onReload} readPosition={readPosition} savePosition={savePosition} />
 
       <div className="composer-area">
         {!busy && (
           <RunControls run={run} messages={messages} disabled={!modelSelection.ready || !loaded || submitting}
             onContinue={() => send('continue')} onRunPending={() => send('pending')} onCancelPending={async () => {
-              if (agent && await request(() => window.granite.runs.cancelPending(agent.id, conversationId))) onReload()
+              if (agent && conversationId && await request(() => window.granite.runs.cancelPending(agent.id, conversationId))) onReload()
             }} />
         )}
 
