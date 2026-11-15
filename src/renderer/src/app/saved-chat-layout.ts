@@ -1,7 +1,7 @@
 import type { Conversation } from '../../../shared/agent.ts'
 import { createPane, updatePane, type Layout, type PaneNode } from '../components/panes/layout.ts'
 import { updateRegion, type RegionLayout } from '../components/panes/regions.ts'
-import { addTab, selectTab, type DraftChatDestination, type NewTab, type Tab } from '../components/panes/tabs.ts'
+import { addTab, selectTab, type DraftChatDestination, type FileDestination, type NewTab, type Tab } from '../components/panes/tabs.ts'
 
 export function findTab(layout: Layout | null, matches: (tab: Tab) => boolean): { pane: PaneNode; tab: Tab } | undefined {
   if (!layout) return
@@ -11,23 +11,40 @@ export function findTab(layout: Layout | null, matches: (tab: Tab) => boolean): 
 }
 
 export function openSavedChat(layout: RegionLayout, identity: Pick<PaneNode, 'id' | 'title'>, chat: Conversation, path: string[]) {
-  const content = layout.regions.find(region => region.type === 'content')!.layout
-  const existing = findTab(content, tab =>
-    tab.type === 'chat' && tab.conversation?.agentId === chat.agentId && tab.conversation.id === chat.id
+  return openContentTab(layout, identity,
+    { type: 'chat', title: chat.title, conversation: { agentId: chat.agentId, id: chat.id, path } },
+    tab => tab.type === 'chat' && tab.conversation?.agentId === chat.agentId && tab.conversation.id === chat.id
   )
+}
+
+export function openWorkspaceFile(layout: RegionLayout, identity: Pick<PaneNode, 'id' | 'title'>, file: FileDestination) {
+  return openContentTab(layout, identity,
+    { type: 'file', title: file.path.slice(file.path.lastIndexOf('/') + 1), file },
+    tab => tab.type === 'file' && tab.file?.agentId === file.agentId && tab.file.path === file.path
+  )
+}
+
+function openContentTab(
+  layout: RegionLayout,
+  identity: Pick<PaneNode, 'id' | 'title'>,
+  tab: Extract<NewTab, { type: 'chat' | 'file' }>,
+  matches: (tab: Tab) => boolean
+) {
+  const content = layout.regions.find(region => region.type === 'content')!.layout
+  const existing = findTab(content, matches)
   if (existing && content) {
     const selected = updatePane(content, existing.pane.id, pane => selectTab(pane, existing.tab.id))
     return { layout: updateRegion(layout, 'content', selected), tabId: existing.tab.id }
   }
 
-  return addChatTab(layout, identity, { type: 'chat', title: chat.title, conversation: { agentId: chat.agentId, id: chat.id, path } })
+  return addContentTab(layout, identity, tab)
 }
 
 export function openDraftChat(layout: RegionLayout, identity: Pick<PaneNode, 'id' | 'title'>, destination: DraftChatDestination) {
-  return addChatTab(layout, identity, { type: 'chat', title: 'New chat', conversation: destination })
+  return addContentTab(layout, identity, { type: 'chat', title: 'New chat', conversation: destination })
 }
 
-function addChatTab(layout: RegionLayout, identity: Pick<PaneNode, 'id' | 'title'>, tab: NewTab) {
+function addContentTab(layout: RegionLayout, identity: Pick<PaneNode, 'id' | 'title'>, tab: NewTab) {
   const content = layout.regions.find(region => region.type === 'content')!.layout
   let target = content
   while (target?.kind === 'split') target = target.first

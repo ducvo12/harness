@@ -9,13 +9,14 @@ import Header from '../components/Header'
 import Workspace, { type LayoutUpdate } from '../components/panes/Workspace'
 import { createPane, findPane, updatePane, type Rect } from '../components/panes/layout'
 import { initialRegions, regionsMinimum, updateRegion, type RegionLayout } from '../components/panes/regions'
-import type { DraftChatDestination, Tab } from '../components/panes/tabs'
+import type { DraftChatDestination, FileDestination, Tab } from '../components/panes/tabs'
 import AgentExplorer, { AgentPicker } from '../features/organization/AgentExplorer'
 import WorkspaceCreationDialog from '../features/organization/WorkspaceCreationDialog'
 import type { ReadingPosition } from '../features/chat/SavedTranscript'
 import WorkspaceChat, { type ComposerDraft } from '../features/chat/WorkspaceChat'
 import Settings from '../features/connections/Settings'
-import { findTab, openDraftChat, openSavedChat, updateChatTab } from './saved-chat-layout'
+import FileView, { type FileDraft } from '../features/workspace/FileView'
+import { findTab, openDraftChat, openSavedChat, openWorkspaceFile, updateChatTab } from './saved-chat-layout'
 import { useSavedResource } from './useSavedResource'
 import { chatKey, useWorkspaceChats, type ChatIdentity } from './useWorkspaceChats'
 
@@ -63,6 +64,7 @@ export default function WorkspaceApp() {
   const workspace = useRef<HTMLElement>(null)
   const positions = useRef(new Map<string, ReadingPosition>())
   const [drafts, setDrafts] = useState(new Map<string, DraftState>())
+  const [fileDrafts, setFileDrafts] = useState(new Map<string, FileDraft>())
   const creatingDrafts = useRef(new Set<string>())
   const [explorerRevisions, setExplorerRevisions] = useState(new Map<string, number>())
   const [creation, setCreation] = useState<Creation>()
@@ -115,6 +117,10 @@ export default function WorkspaceApp() {
       const open = [...current].filter(([viewId]) => findTab(content, tab => tab.id === viewId))
       return open.length === current.size ? current : new Map(open)
     })
+    setFileDrafts(current => {
+      const open = [...current].filter(([viewId]) => findTab(content, tab => tab.id === viewId))
+      return open.length === current.size ? current : new Map(open)
+    })
   }, [layout])
 
   useEffect(() => {
@@ -156,6 +162,28 @@ export default function WorkspaceApp() {
       return { ...withLayout(current, opened.layout), focus: { tabId: opened.tabId } }
     })
     chatSession.load(chat)
+  }
+
+  function openFile(file: FileDestination) {
+    setState(current => {
+      const opened = openWorkspaceFile(current.layout, nextGroup(current), file)
+      return { ...withLayout(current, opened.layout), focus: { tabId: opened.tabId } }
+    })
+  }
+
+  function updateFileDraft(id: string, draft?: FileDraft) {
+    setFileDrafts(current => {
+      const next = new Map(current)
+      if (draft) next.set(id, draft)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  function fileCloseReason(tab: Tab) {
+    const draft = fileDrafts.get(tab.id)
+    if (draft?.saving) return 'Wait for the file to finish saving'
+    if (draft && draft.text !== draft.original) return 'Save or cancel your file edits before closing'
   }
 
   function newChat(destination: DraftChatDestination) {
@@ -261,7 +289,7 @@ export default function WorkspaceApp() {
     const agent = agents.value.find(item => item.id === agentId)
     if (agent) {
       return <AgentExplorer key={pickerId} agent={agent} revision={explorerRevisions.get(agent.id) ?? 0}
-        onOpenChat={openChat} onNewChat={newChat}
+        onOpenFile={path => openFile({ agentId: agent.id, path })} onOpenChat={openChat} onNewChat={newChat}
         onNewSection={() => setCreation({ kind: 'section', agentId: agent.id })}
         onNewProject={section => setCreation({ kind: 'project', section })} />
     }
@@ -272,6 +300,14 @@ export default function WorkspaceApp() {
 
   function renderTab(tab: Tab) {
     if (tab.type === 'agent') return renderExplorer(tab.agentId, tab.id)
+    if (tab.type === 'file' && tab.file && agents?.ok) {
+      const file = tab.file
+      const agent = agents.value.find(item => item.id === file.agentId)
+      if (agent) return (
+        <FileView key={tab.id} agent={agent} path={file.path}
+          edit={{ draft: fileDrafts.get(tab.id), setDraft: draft => updateFileDraft(tab.id, draft) }} />
+      )
+    }
     if (tab.type === 'chat' && tab.conversation) {
       const conversation = tab.conversation
       const key = conversation.id !== undefined ? chatKey(conversation) : undefined
@@ -330,7 +366,8 @@ export default function WorkspaceApp() {
       <Workspace
         layout={layout}
         renderTab={renderTab}
-        renderEmptyRegion={type => type === 'explorer' ? renderExplorer() : <p>Open or start a chat from Explorer.</p>}
+        renderEmptyRegion={type => type === 'explorer' ? renderExplorer() : <p>Open a file or chat from Explorer.</p>}
+        tabCloseReason={fileCloseReason}
         onLayoutChange={changeLayout}
         onBoundsChange={setBounds}
         newPane={nextGroup(state)}

@@ -5,13 +5,19 @@ type ChatPath = { agentId: string; path: string[] }
 export type DraftChatDestination = ChatPath & { id?: never; location: ConversationLocation }
 type ChatDestination = (ChatPath & { id: string; location?: never }) | DraftChatDestination
 
+export type FileDestination = { agentId: string; path: string }
+
 export type Tab = { id: string; title: string } & (
   | { type: 'agent'; agentId?: string }
   | { type: 'chat'; conversation?: ChatDestination }
-  | { type: 'image' | 'file' }
+  | { type: 'file'; file?: FileDestination }
+  | { type: 'image' }
 )
 
-export type NewTab = Omit<Extract<Tab, { type: 'agent' }>, 'id'> | Omit<Extract<Tab, { type: 'chat' }>, 'id'>
+export type NewTab =
+  | Omit<Extract<Tab, { type: 'agent' }>, 'id'>
+  | Omit<Extract<Tab, { type: 'chat' }>, 'id'>
+  | Omit<Extract<Tab, { type: 'file' }>, 'id'>
 
 export interface PaneTabs {
   paneType: PaneType

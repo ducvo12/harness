@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -58,7 +58,8 @@ function workspaceSession(profile, entry) {
 }
 
 async function verifyCreation(entry) {
-  const fresh = workspaceSession(join(directory, 'fresh-profile'), entry)
+  const profile = join(directory, 'fresh-profile')
+  const fresh = workspaceSession(profile, entry)
   const { evaluate, click, fill, wait } = fresh
   const dialog = 'dialog.workspace-creation[open]'
   const name = dialog + ' input'
@@ -128,14 +129,77 @@ async function verifyCreation(entry) {
     assert.deepEqual((await read('window.granite.agents.list()')).map(agent => agent.name).sort(), ['Aster', 'Nova'])
 
     await fresh.quit()
+    const root = join(profile, 'agents', nova.id)
+    await writeFile(join(root, 'AGENTS.md'), '# Existing instructions')
+    await mkdir(join(root, 'notes', 'nested'))
+    await writeFile(join(root, 'notes', 'nested', 'Plan.md'), '# Nested plan')
+    await writeFile(join(root, 'notes', 'example.png'), 'Image fixture')
     await fresh.launch()
     await wait(() => evaluate('Boolean(document.querySelector(".agent-picker-create"))'), 'agent picker after relaunch')
     await click('Nova')
     await wait(() => evaluate('Boolean(document.querySelector("[aria-label=\'New chat in Roadmap\']"))'), 'project survives relaunch')
+    await verifyMarkdown(fresh, root)
   } finally {
     await fresh.quit()
   }
   console.log('Fresh-profile creation for agents, sections, and chat-only projects passed, including validation and relaunch.')
+}
+
+async function verifyMarkdown({ evaluate, click, fill, wait }, root) {
+  const instructions = join(root, 'AGENTS.md')
+  const editor = '.file-editor'
+  const preview = text => wait(() => evaluate(
+    `document.querySelector('.file-preview')?.textContent.includes(${JSON.stringify(text)})`
+  ), `file preview contains ${text}`)
+  const activeTab = () => evaluate('document.querySelector("[data-region=content] [role=tab][aria-selected=true]")?.id')
+
+  const fileRow = path => `button.tree-file[title="${path}"]`
+  const findFile = path => `document.querySelector(${JSON.stringify(fileRow(path))})`
+  const openFile = path => evaluate(`${findFile(path)}.click()`)
+
+  await wait(() => evaluate(`Boolean(${findFile('AGENTS.md')})`), 'Markdown files appear in Explorer')
+  await openFile('AGENTS.md')
+  await preview('Existing instructions')
+  const fileTab = await activeTab()
+  await click('Edit')
+  await fill(editor, '# Updated instructions', 'textarea')
+
+  await openFile('identity.md')
+  await preview('This file is empty.')
+  await openFile('AGENTS.md')
+  assert.equal(await activeTab(), fileTab)
+  assert.equal(await evaluate('document.activeElement.id'), fileTab)
+  assert.equal(await evaluate('document.querySelector(".file-editor").value'), '# Updated instructions')
+  assert.equal(await evaluate(`document.getElementById('${fileTab}').nextElementSibling.disabled`), true)
+  assert.equal(await evaluate(`document.getElementById('${fileTab}').closest('.pane').querySelector('.pane-close').disabled`), true)
+
+  await writeFile(instructions, '# External revision')
+  await click('Save')
+  await wait(() => evaluate('document.querySelector(".file-error")?.textContent.includes("changed")'), 'external edit is protected')
+  assert.equal(await evaluate('document.querySelector(".file-editor").value'), '# Updated instructions')
+  assert.equal(await readFile(instructions, 'utf8'), '# External revision')
+  await click('Discard draft and reload')
+  await preview('External revision')
+
+  await click('Edit')
+  await fill(editor, '# Updated instructions', 'textarea')
+  await click('Save')
+  await preview('Updated instructions')
+  assert.equal(await readFile(instructions, 'utf8'), '# Updated instructions')
+
+  await click('notes/')
+  await wait(() => evaluate('Boolean(document.querySelector(".notes-tree .notes-tree"))'), 'nested Notes folder appears')
+  assert.doesNotMatch(await evaluate('document.querySelector(".notes-tree").textContent'), /example\.png/)
+  await click('nested/')
+  await wait(() => evaluate(`Boolean(${findFile('/notes/nested/Plan.md')})`), 'nested Markdown file appears')
+  await openFile('/notes/nested/Plan.md')
+  await preview('Nested plan')
+  await click('Edit')
+  await fill(editor, '# Unsaved plan', 'textarea')
+  await click('Cancel')
+  await preview('Nested plan')
+  assert.equal(await readFile(join(root, 'notes', 'nested', 'Plan.md'), 'utf8'), '# Nested plan')
+  console.log('Markdown discovery, preview, draft protection, revision checks, Save, and Cancel passed.')
 }
 
 function seedProfile() {

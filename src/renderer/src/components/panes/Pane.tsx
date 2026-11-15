@@ -5,6 +5,7 @@ import type { Tab } from './tabs'
 interface PaneProps {
   pane: PaneNode
   renderTab: (tab: Tab) => ReactNode
+  tabCloseReason: (tab: Tab) => string | undefined
   dropEdge?: Edge
   floating?: Pick<CSSProperties, 'left' | 'top' | 'width' | 'height' | 'translate'>
   hasRegionHandle?: boolean
@@ -19,8 +20,9 @@ interface PaneProps {
 
 // Keep the pane's layout slot stable while its surface floats. Tabs are controlled
 // by the layout so moving the pane cannot discard their state.
-export default function Pane({ pane, renderTab, dropEdge, floating, hasRegionHandle = false, draggedTabId, onTabDragStart, onDragStart, onClose, onAddTab, onSelectTab, onCloseTab }: PaneProps) {
+export default function Pane({ pane, renderTab, tabCloseReason, dropEdge, floating, hasRegionHandle = false, draggedTabId, onTabDragStart, onDragStart, onClose, onAddTab, onSelectTab, onCloseTab }: PaneProps) {
   const active = pane.tabs.find(tab => tab.id === pane.activeTabId)!
+  const paneCloseReason = pane.tabs.map(tabCloseReason).find(Boolean)
   const titlebar = useRef<HTMLDivElement>(null)
 
   // Keep the selected tab reachable when the strip has more tabs than fit on screen.
@@ -86,6 +88,8 @@ export default function Pane({ pane, renderTab, dropEdge, floating, hasRegionHan
                   type="button"
                   className="tab-close quiet-button"
                   aria-label={`Close ${tab.title} in ${pane.title}`}
+                  disabled={Boolean(tabCloseReason(tab))}
+                  title={tabCloseReason(tab)}
                   onClick={() => closeTab(tab.id)}
                 >
                   ×
@@ -112,7 +116,8 @@ export default function Pane({ pane, renderTab, dropEdge, floating, hasRegionHan
             type="button"
             className="pane-close quiet-button"
             aria-label={`Close ${pane.title}`}
-            title={`Close ${pane.title}`}
+            title={paneCloseReason ?? `Close ${pane.title}`}
+            disabled={Boolean(paneCloseReason)}
             style={{ '--vt': `close-${pane.id}` } as CSSProperties}
             onClick={onClose}
           >

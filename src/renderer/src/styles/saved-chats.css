@@ -37,6 +37,10 @@
   border-radius: var(--radius-sm);
 }
 
+.agent-markdown-files {
+  margin-bottom: 12px;
+}
+
 .agent-tree-children {
   margin-left: 10px;
   padding-left: 8px;
@@ -124,4 +128,17 @@
 
 .workspace-creation::backdrop {
   background: color-mix(in srgb, var(--overlay) 70%, transparent);
+}
+
+.workspace-app .file-main {
+  height: 100%;
+}
+
+.workspace-app .file-heading {
+  padding-inline: 12px;
+}
+
+.workspace-app .file-breadcrumb,
+.workspace-app .file-editor {
+  font-family: var(--font-mono);
 }

@@ -5,6 +5,7 @@ import { defaultTreeSort, sortTreeEntries } from '../../app/tree-sort'
 import { useSavedResource } from '../../app/useSavedResource'
 import type { DraftChatDestination } from '../../components/panes/tabs'
 import TreeActionIcon from '../../components/TreeActionIcon'
+import AgentMarkdownFiles from '../workspace/AgentMarkdownFiles'
 
 export function AgentPicker({ agents, onChoose, onNewAgent }: {
   agents: Agent[]
@@ -31,13 +32,14 @@ export function AgentPicker({ agents, onChoose, onNewAgent }: {
 interface AgentExplorerProps {
   agent: Agent
   revision: number
+  onOpenFile: (path: string) => void
   onOpenChat: (chat: Conversation, path: string[]) => void
   onNewChat: (destination: DraftChatDestination) => void
   onNewSection: () => void
   onNewProject: (section: Section) => void
 }
 
-export default function AgentExplorer({ agent, revision, onOpenChat, onNewChat, onNewSection, onNewProject }: AgentExplorerProps) {
+export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat, onNewChat, onNewSection, onNewProject }: AgentExplorerProps) {
   const agentId = agent.id
   const load = useCallback(async () => {
     const [organization, conversations] = await Promise.all([
@@ -104,6 +106,8 @@ export default function AgentExplorer({ agent, revision, onOpenChat, onNewChat, 
           New section
         </button>
       </div>
+
+      <AgentMarkdownFiles agentId={agentId} revision={revision} onOpen={onOpenFile} />
 
       {!sections.length && <p className="tree-empty">No saved sections.</p>}
 
