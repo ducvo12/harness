@@ -332,6 +332,13 @@ Pass 5 concludes the 5-pass codebase cleanup, consolidating changes, eliminating
 
 ## Future optimizations
 
+### MD editor
+
+- Add separate Edit and Preview tabs for the same Markdown file, with a
+  **Preview to the Side** action like VS Code. Either tab can be docked in
+  a Content pane. The preview updates as you type, and Save writes the
+  edits to disk.
+
 ### Harness context and token efficiency
 - **Stale tool output eviction:** Replace bulky historical tool results (such as large file reads or file-search listings from completed turns) with compact tombstone markers (`[Read N lines from <path> — evicted from history]`) to prevent the compound context tax on multi-step agent runs.
 - **Dynamic command and test output truncation:** Condense verbose stdout/stderr logs from passing test suites and build commands in conversation history, preserving only status summaries, exit codes, and error backtraces.
