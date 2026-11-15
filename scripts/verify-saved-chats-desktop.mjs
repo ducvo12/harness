@@ -151,7 +151,23 @@ try {
 
     await click('Close Long saved chat in Group 2')
     await wait(async () => await tabCount() === 1, 'first chat closed')
-    await click('Close Project saved chat in Group 2')
+    await wait(() => evaluate('!document.querySelector(".pane-titlebar[data-transition]")'), 'first tab exit finished')
+    const exitProgress = await evaluate(`(async () => {
+      const pane = document.querySelector(${JSON.stringify(content + ' .pane')})
+      pane.querySelector('.tab-close').click()
+      let exit
+      const deadline = performance.now() + 1000
+      while (!exit && performance.now() < deadline) {
+        await new Promise(requestAnimationFrame)
+        exit = document.getAnimations().find(animation =>
+          animation.animationName === 'vt-exit' &&
+          animation.effect.pseudoElement === '::view-transition-old(pane-' + pane.dataset.paneId + ')')
+      }
+      if (!exit) throw new Error('Final chat pane exit animation did not start')
+      await exit.finished
+      return exit.effect.getComputedTiming().progress
+    })()`)
+    assert.equal(exitProgress, 1, 'the final chat pane holds its faded-out state after the exit animation')
     await wait(async () => await tabCount() === 0, 'Content becomes empty')
     await click('Long saved chat')
     await wait(() => evaluate(longVisible), 'chat reopened from empty Content')

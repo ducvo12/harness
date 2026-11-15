@@ -608,7 +608,7 @@
 
 .workspace::view-transition-old(.vt-pane):only-child,
 .pane-titlebar::view-transition-old(.vt-tab):only-child {
-  animation: vt-exit var(--duration-fast) var(--ease-exit);
+  animation: vt-exit var(--duration-fast) var(--ease-exit) forwards;
 }
 
 @keyframes vt-enter {
