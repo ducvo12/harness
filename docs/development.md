@@ -24,15 +24,6 @@ The development command prepares native PTY helpers, opens Electron and serves R
 | `npm run package` | Build and create a local unpacked app in `release/`. |
 | `npm run dist` | Build an installer; public distribution needs platform signing configuration. |
 
-The read-only saved-chat workspace is available with
-`npm run dev -- -- --workspace`. For a compiled build, use
-`npm run preview -- -- --workspace`. Choose an agent in Explorer, then open a
-saved chat. Drag a chat tab into a group body to split it, or into another
-group's tab strip to merge it. The current shell remains the default.
-
-After a build, run `node scripts/verify-saved-chats-desktop.mjs` on macOS to
-check the new workspace against a disposable copy of a seeded profile.
-
 SQLite and PTY native components must match Electron. Installation prepares them; packaged PTY helpers are unpacked through the build configuration. Packaging is not publishing.
 
 The test runner discovers `.test.ts` and `.test.mjs` files recursively under `tests/`.
@@ -45,6 +36,65 @@ npm test -- --test-name-pattern='model leases' --test-reporter=spec
 Supported options are `--test-name-pattern`, `--test-skip-pattern`,
 `--test-reporter`, `--test-concurrency` and `--test-timeout`. Unknown arguments
 fail instead of being silently ignored.
+
+## Saved-chat workspace
+
+`connect-explorer` starts from `main` and ports the window system from
+`rebuild`. The existing Granite shell is the default for `npm run dev`. To
+open the opt-in workspace, run `npm run dev -- -- --workspace`, or
+`npm run preview -- -- --workspace` after a build. The first `--` forwards
+arguments through npm, the second forwards them through electron-vite, and
+`--workspace` selects the new shell for that launch.
+
+### Confirmed on rebuild
+
+- Explorer and Content are side-by-side regions that can swap places and keep
+  their widths and split layouts. Their groups resize and split within their
+  own region. Tabs merge or reorder at the tab strip and split on body drops.
+  Dragging moves the existing view and preserves its identity.
+- Explorer opens chats in Content and focuses an existing view when one is open.
+  The view owns scrolling and drafts. A conversation owns messages and runs,
+  and closing its tab leaves the run active. If duplicate views are introduced,
+  Explorer should focus the most recently used one. The duplicate-view gesture
+  and draft recovery rules remain open.
+- The planned layout is app-wide. The full interaction rules and original
+  decisions are in `docs/development.md` and `docs/rebuild-branch-record.md`
+  on `rebuild`. The port uses the pane behavior at `7669e61`.
+
+### Completed on connect-explorer
+
+- `f7e1a93` ports the opt-in workspace shell, pane controls, and native window
+  sizing onto `main`, alongside its existing agent worker and SQLite storage.
+- `0c73c91` connects agent tabs in Explorer to saved sections, projects, and
+  chats. Clicking a chat opens its read-only transcript in Content with its
+  agent and location. Clicking it again selects and focuses the same tab,
+  including after docking. Separate chats can be viewed side by side.
+- The workspace keeps the visible message and scroll offset per tab through
+  tab switches, splits, and merges. Closing the tab ends that view. Reopening
+  the chat creates a fresh view at the latest message, including when Content
+  is empty.
+
+The milestone passed lint, both type checks, all 275 tests, and a fresh build.
+On macOS, the desktop check launched both shells and verified opening,
+focusing, splitting, merging, and reopening chats on a disposable copy of a
+seeded profile, with zero requests to the simulated model provider. Run
+`node scripts/verify-saved-chats-desktop.mjs` after a build to repeat the check.
+
+### Before merging to main
+
+The next milestone is the composer and live runs. Layout persistence follows.
+Before merging and making the workspace the default shell, verify all four:
+
+1. **Existing profiles.** Use a disposable copy of an existing Granite profile.
+   Confirm its agents, sections, projects, saved chats, and transcripts appear
+   in the new shell. The completed desktop check used a seeded profile.
+2. **Daily chat workflows.** Verify Send, streaming, and Stop. Close and
+   reopen a tab during an active run and confirm the run continues. Drag and
+   resize panes with a long transcript and an active stream.
+3. **Layout restoration.** Restart Granite and confirm region widths, splits,
+   and open views return in one app-wide layout.
+4. **Regression checks.** Run lint, both type checks, the full test suite, a
+   fresh build, and the applicable desktop checks.
 
 ## Source layout
 

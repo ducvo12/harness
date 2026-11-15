@@ -3,6 +3,7 @@
 A local desktop workspace for personal agents. Granite owns its model/tool loop and supports ChatGPT account sign-in, Responses API connections and OpenAI-compatible local servers.
 
 - [Development and verification](docs/development.md)
+- [Saved-chat workspace and integration status](docs/development.md#saved-chat-workspace)
 - [Implemented harness behavior](docs/harness.md)
 - [Planning vault: start here](<docs/vault/Start Here.md>)
 - [v0.1 delivery archive and acceptance criteria](<docs/vault/archive/v0.1/Harness Implementation Plan.md>)
