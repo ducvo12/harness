@@ -214,10 +214,13 @@ port.on('message', async ({ data }: { data: Request }) => {
 
     port.postMessage({ id, result: { ok: true, value } })
   } catch (error) {
+    const fileError = action === 'read' ? (error as NodeJS.ErrnoException)?.code : undefined
+    let code
+    if (error instanceof ModelAccessError) code = 'model_access'
+    else if (fileError === 'ENOENT' || fileError === 'ENOTDIR') code = 'not_found'
     port.postMessage({
       id,
-      result: { ok: false, error: error instanceof Error ? error.message : 'Agent request failed.',
-        ...(error instanceof ModelAccessError ? { code: 'model_access' } : {}) }
+      result: { ok: false, error: error instanceof Error ? error.message : 'Agent request failed.', ...(code && { code }) }
     })
   }
 })

@@ -8,7 +8,7 @@ import type { Section, SectionMode } from '../../../shared/organization'
 import Header from '../components/Header'
 import Workspace, { type LayoutUpdate } from '../components/panes/Workspace'
 import { createPane, findPane, updatePane, type Rect } from '../components/panes/layout'
-import { initialRegions, regionsMinimum, updateRegion, type RegionLayout } from '../components/panes/regions'
+import { regionsMinimum, updateRegion, type RegionLayout } from '../components/panes/regions'
 import type { DraftChatDestination, FileDestination, Tab } from '../components/panes/tabs'
 import AgentExplorer, { AgentPicker } from '../features/organization/AgentExplorer'
 import WorkspaceCreationDialog from '../features/organization/WorkspaceCreationDialog'
@@ -19,10 +19,10 @@ import FileView, { type FileDraft } from '../features/workspace/FileView'
 import { findTab, openDraftChat, openSavedChat, openWorkspaceFile, updateChatTab } from './saved-chat-layout'
 import { useSavedResource } from './useSavedResource'
 import { chatKey, useWorkspaceChats, type ChatIdentity } from './useWorkspaceChats'
+import { filterWorkspaceTabs, findMissingWorkspaceTabs, loadWorkspaceLayout, saveWorkspaceLayout,
+  workspacePanes, type SavedWorkspaceLayout } from './workspace-layout-storage'
 
-interface WorkspaceState {
-  layout: RegionLayout
-  nextPane: number
+interface WorkspaceState extends SavedWorkspaceLayout {
   focus?: { tabId: string; composer?: boolean }
 }
 
@@ -55,10 +55,9 @@ function loadConnections() {
 const emptyDraft: DraftState = { text: '', attachments: [] }
 
 export default function WorkspaceApp() {
-  const [state, setState] = useState<WorkspaceState>(() => ({
-    layout: updateRegion(initialRegions, 'content', null),
-    nextPane: 2
-  }))
+  const [restored] = useState(loadWorkspaceLayout)
+  const [state, setState] = useState<WorkspaceState>(restored)
+  const checkedRestoredTabs = useRef(false)
   const [bounds, setBounds] = useState<Rect>({ x: 0, y: 0, width: 0, height: 0 })
   const [windowError, setWindowError] = useState('')
   const workspace = useRef<HTMLElement>(null)
@@ -79,7 +78,7 @@ export default function WorkspaceApp() {
   const defaultConnection = connections?.ok
     ? (connections.value.find(item => item.id === selectedConnection) ?? connections.value[0])?.id ?? ''
     : ''
-  const { layout, focus } = state
+  const { layout, nextPane, focus } = state
   const measured = bounds.width > 0 && bounds.height > 0
   const minimum = regionsMinimum(layout)
   const minWidth = Math.ceil(minimum.width + window.innerWidth - bounds.width)
@@ -107,6 +106,38 @@ export default function WorkspaceApp() {
   useLayoutEffect(() => {
     if (settingsOpen) settings.current?.showModal()
   }, [settingsOpen])
+
+  useLayoutEffect(() => {
+    const save = () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pagehide', save)
+      saveWorkspaceLayout({ layout, nextPane })
+    }
+    const timer = window.setTimeout(save, 120)
+    window.addEventListener('pagehide', save)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pagehide', save)
+    }
+  }, [layout, nextPane])
+
+  useEffect(() => {
+    if (!agents?.ok || checkedRestoredTabs.current) return
+    let current = true
+    void findMissingWorkspaceTabs(restored.layout, agents.value, window.granite).then(missing => {
+      if (!current) return
+      checkedRestoredTabs.current = true
+      if (missing.size) setState(current => withLayout(current, filterWorkspaceTabs(current.layout, tab => !missing.has(tab.id))))
+    })
+    return () => { current = false }
+  }, [agents, restored])
+
+  useEffect(() => {
+    for (const pane of workspacePanes(layout)) {
+      const active = pane.tabs.find(tab => tab.id === pane.activeTabId)
+      if (active?.type === 'chat' && active.conversation?.id !== undefined) chatSession.load(active.conversation)
+    }
+  }, [layout])
 
   useEffect(() => {
     const content = layout.regions.find(region => region.type === 'content')!.layout
@@ -161,7 +192,6 @@ export default function WorkspaceApp() {
       const opened = openSavedChat(current.layout, nextGroup(current), chat, path)
       return { ...withLayout(current, opened.layout), focus: { tabId: opened.tabId } }
     })
-    chatSession.load(chat)
   }
 
   function openFile(file: FileDestination) {

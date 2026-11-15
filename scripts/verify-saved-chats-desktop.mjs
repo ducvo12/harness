@@ -128,6 +128,8 @@ async function verifyCreation(entry) {
     await wait(() => evaluate('document.querySelector("[data-region=explorer] [role=tab][aria-selected=true]").textContent === "Aster"'), 'new agent replaces its picker')
     assert.deepEqual((await read('window.granite.agents.list()')).map(agent => agent.name).sort(), ['Aster', 'Nova'])
 
+    await wait(() => evaluate(`JSON.parse(localStorage.getItem('granite.workspace.layout'))?.layout.regions[0].layout.tabs.length === 2`),
+      'agent tabs written to storage')
     await fresh.quit()
     const root = join(profile, 'agents', nova.id)
     await writeFile(join(root, 'AGENTS.md'), '# Existing instructions')
@@ -135,7 +137,8 @@ async function verifyCreation(entry) {
     await writeFile(join(root, 'notes', 'nested', 'Plan.md'), '# Nested plan')
     await writeFile(join(root, 'notes', 'example.png'), 'Image fixture')
     await fresh.launch()
-    await wait(() => evaluate('Boolean(document.querySelector(".agent-picker-create"))'), 'agent picker after relaunch')
+    await wait(() => evaluate('document.querySelector("[data-region=explorer] [role=tab][aria-selected=true]").textContent === "Aster"'),
+      'selected agent tab restored after relaunch')
     await click('Nova')
     await wait(() => evaluate('Boolean(document.querySelector("[aria-label=\'New chat in Roadmap\']"))'), 'project survives relaunch')
     await verifyMarkdown(fresh, root)
@@ -208,6 +211,7 @@ function seedProfile() {
     const runtime = await AgentRuntime.open(${JSON.stringify(original)})
     try {
       const atlas = await runtime.createAgent('Archive')
+      await runtime.saveMarkdown(atlas.id, '/notes/Workspace.md', '# Workspace note', null)
       await runtime.createAgent('Second agent')
       const section = await runtime.createSection(atlas.id, 'Planning', 'closed')
       await runtime.createSection(atlas.id, 'Empty section', 'shared')
@@ -539,6 +543,83 @@ try {
     await wait(() => transcriptContains('Reply in the new project chat'), 'new project chat reopens from storage')
     assert.notEqual(await activeTabId(), projectTab)
     assert.deepEqual(prompts.slice(3), ['Start a General chat', 'Start a project chat'])
+
+    const storageKey = 'granite.workspace.layout'
+    const noteRow = '.tree-file[title="/notes/Workspace.md"]'
+    const filePreview = 'document.querySelector(".file-preview")?.textContent.includes("Workspace note")'
+    const tabPresent = id => evaluate(`Boolean(document.getElementById(${JSON.stringify(id)}))`)
+    const keyDown = (selector, key) => evaluate(`document.querySelector(${JSON.stringify(selector)})
+      .dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true }))`)
+    const geometry = () => evaluate(`({
+      regions: Array.from(document.querySelectorAll('[data-region]'), node => [node.dataset.region, Math.round(node.getBoundingClientRect().width)]),
+      dividers: Array.from(document.querySelectorAll('[role=separator]'), node => [node.ariaLabel, node.ariaValueNow]),
+      panes: Array.from(document.querySelectorAll('[data-pane-id]'), pane => ({
+        id: pane.dataset.paneId,
+        tabs: Array.from(pane.querySelectorAll('[role=tab]'), tab => [tab.id, tab.ariaSelected])
+      }))
+    })`)
+    const stored = () => evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(storageKey)}))`)
+
+    await click('notes/')
+    await wait(() => evaluate(`Boolean(document.querySelector(${JSON.stringify(noteRow)}))`), 'Workspace note appears in Explorer')
+    await evaluate(`document.querySelector(${JSON.stringify(noteRow)}).click()`)
+    await wait(() => evaluate(filePreview), 'Workspace note opens')
+    const noteTab = await activeTabId()
+    await dragTab(noteTab, content + ' .pane-body', 0.78, 0.5, '.pane-dock-preview')
+    const innerDivider = '[aria-label="Resize Content groups"]'
+    await wait(() => evaluate(`Boolean(document.querySelector(${JSON.stringify(innerDivider)}))`), 'file has its own pane')
+    const outerDivider = '[aria-label="Resize regions"]'
+    const beforeResize = await geometry()
+    await keyDown(innerDivider, 'ArrowLeft')
+    await keyDown(outerDivider, 'ArrowLeft')
+    const afterResize = await geometry()
+    assert.ok(afterResize.dividers.every((divider, index) => divider[1] !== beforeResize.dividers[index][1]))
+    await keyDown('[aria-label="Move Explorer region"]', 'ArrowRight')
+    await wait(() => evaluate('document.querySelector("[data-region]").dataset.region === "content"'), 'regions swap')
+
+    await click('Edit')
+    await fill('.file-editor', 'Unsaved file text', 'textarea')
+    await click('New chat')
+    const unsavedTab = await evaluate('document.activeElement.closest("[role=tabpanel]").getAttribute("aria-labelledby")')
+    await click('Start a project chat')
+    await wait(() => transcriptContains('Reply in the new project chat'), 'saved chat is selected beside the note')
+    const savedGeometry = await geometry()
+    const expected = { ...savedGeometry, panes: savedGeometry.panes.map(pane => ({
+      ...pane, tabs: pane.tabs.filter(([id]) => id !== unsavedTab)
+    })) }
+    assert.ok(savedGeometry.panes.some(pane => pane.tabs.some(([id]) => id === unsavedTab)))
+    await wait(async () => (await stored())?.layout.regions[0].type === 'content', 'swapped layout written to storage')
+    const saved = JSON.stringify(await stored())
+    assert.ok(saved.includes(noteTab))
+    assert.ok(!saved.includes(unsavedTab) && !saved.includes('Unsaved file text'))
+
+    await desktop.quit()
+    await desktop.launch()
+    await wait(() => evaluate(filePreview), 'file preview restored without its draft')
+    await wait(() => transcriptContains('Reply in the new project chat'), 'saved chat restored without an Explorer click')
+    assert.deepEqual(await geometry(), expected)
+
+    await click('Start a General chat')
+    await wait(() => transcriptContains('Reply in the new General chat'), 'restored inactive chat loads when selected')
+    assert.equal(await evaluate(`document.getElementById(${JSON.stringify(generalTab)}).ariaSelected`), 'true')
+    await click('Start a project chat')
+    const removed = await evaluate(`window.granite.conversations.delete(${JSON.stringify(agentId)}, ${JSON.stringify(savedGeneral.id)})`)
+    assert.equal(removed.ok, true, removed.error)
+    await rm(join(copy, 'agents', agentId, 'notes', 'Workspace.md'))
+    await desktop.quit()
+    await desktop.launch()
+    await wait(async () => !await tabPresent(generalTab) && !await tabPresent(noteTab), 'deleted chat and file are removed on restore')
+    await wait(() => transcriptContains('Reply in the new project chat'), 'surviving chat still opens')
+    assert.deepEqual(prompts.slice(3), ['Start a General chat', 'Start a project chat'])
+
+    await wait(async () => !JSON.stringify(await stored()).includes(noteTab), 'reconciled layout written to storage')
+    await evaluate(`localStorage.setItem(${JSON.stringify(storageKey)}, '{"version":1,"layout":null}')`)
+    await desktop.quit()
+    await desktop.launch()
+    await wait(() => evaluate('Boolean(document.querySelector(".agent-picker-create"))'), 'invalid snapshot restores the default explorer')
+    assert.equal(await tabCount(), 0)
+    assert.equal(await evaluate('document.querySelector("[data-region]").dataset.region'), 'explorer')
+    console.log('Workspace order, widths, splits, and saved tabs survived restart. Deleted tabs and malformed snapshots recovered.')
   } finally {
     await desktop.quit()
   }

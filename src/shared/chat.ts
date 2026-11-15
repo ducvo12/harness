@@ -62,7 +62,7 @@ export interface Message {
   interrupted?: boolean
 }
 
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string; code?: 'model_access' }
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string; code?: 'model_access' | 'not_found' }
 
 export interface StreamActivity {
   reasoningCharacters: number

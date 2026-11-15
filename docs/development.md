@@ -95,11 +95,15 @@ Explorer can create agents from the agent picker, Shared or Closed sections
 for the selected agent, and chat-only projects within custom sections. A new
 agent opens in the Explorer tab that created it.
 
+The workspace restores region order and widths, pane splits, and open saved
+views on launch. Unsaved chat and Markdown drafts are session-only. The
+desktop check verifies restoration and recovery from deleted tabs and an
+invalid snapshot.
+
 Run `node scripts/verify-saved-chats-desktop.mjs` after a build.
 
 ### Before merging to main
 
-The next milestone is layout persistence.
 Before merging and making the workspace the default shell, verify all four:
 
 1. **Fresh and existing profiles.** Verify the first agent, section, and
