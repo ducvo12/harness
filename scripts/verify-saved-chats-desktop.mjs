@@ -51,6 +51,93 @@ const provider = createServer(async (request, response) => {
   response.end('data: [DONE]\n\n')
 })
 
+function workspaceSession(profile, entry) {
+  return desktopSession(profile, 9462, { ELECTRON_RENDERER_URL: '' }, entry, undefined, {
+    ready: 'Boolean(document.querySelector(".workspace-app"))'
+  })
+}
+
+async function verifyCreation(entry) {
+  const fresh = workspaceSession(join(directory, 'fresh-profile'), entry)
+  const { evaluate, click, fill, wait } = fresh
+  const dialog = 'dialog.workspace-creation[open]'
+  const name = dialog + ' input'
+  const mode = dialog + ' select'
+  const read = async expression => {
+    const result = await evaluate(expression)
+    assert.equal(result.ok, true, result.error)
+    return result.value
+  }
+  const close = () => wait(() => evaluate(`!document.querySelector(${JSON.stringify(dialog)})`), 'creation dialog closes')
+
+  try {
+    await fresh.launch()
+    await wait(() => evaluate('document.querySelector(".agent-explorer")?.textContent.includes("No saved agents.")'), 'empty profile agent picker')
+    assert.deepEqual(await read('window.granite.agents.list()'), [])
+
+    await click('New agent')
+    assert.ok(await evaluate(`document.activeElement === document.querySelector(${JSON.stringify(name)})`))
+    assert.equal(await evaluate(`document.querySelector(${JSON.stringify(dialog + ' button[type=submit]')}).disabled`), true)
+    await fill(name, 'Nova')
+    await click('Create agent')
+    await close()
+    await wait(() => evaluate('document.querySelector(".agent-explorer")?.textContent.includes("General")'), 'first agent has General')
+    assert.equal(await evaluate('document.querySelector("[data-region=explorer] [role=tab][aria-selected=true]").textContent'), 'Nova')
+    const [nova] = await read('window.granite.agents.list()')
+    assert.equal(nova.name, 'Nova')
+    assert.equal(await evaluate('Boolean(document.querySelector("[aria-label=\'New project in General\']"))'), false)
+
+    await click('New section')
+    assert.equal(await evaluate(`document.querySelector(${JSON.stringify(mode)}).value`), 'shared')
+    await fill(name, 'Research')
+    await fill(mode, 'closed', 'select')
+    await click('Create section')
+    await close()
+    await wait(() => evaluate('Boolean(document.querySelector("[aria-label=\'New project in Research\']"))'), 'section appears in Explorer')
+
+    await click('New project in Research')
+    assert.doesNotMatch(await evaluate(`document.querySelector(${JSON.stringify(dialog)}).textContent`), /repository/i)
+    await fill(name, 'Road<map')
+    await click('Create project')
+    await wait(() => evaluate(`document.querySelector(${JSON.stringify(dialog + ' [role=alert]')})?.textContent.includes('angle brackets')`),
+      'invalid name is rejected')
+    assert.equal(await evaluate(`document.querySelector(${JSON.stringify(name)}).value`), 'Road<map')
+    await fill(name, 'Roadmap')
+    await click('Create project')
+    await close()
+    await wait(() => evaluate('Boolean(document.querySelector("[aria-label=\'New chat in Roadmap\']"))'), 'project appears in Explorer')
+    const organization = await read(`window.granite.organization.get(${JSON.stringify(nova.id)})`)
+    const section = organization.sections.find(item => item.name === 'Research')
+    assert.equal(section.mode, 'closed')
+    assert.equal(organization.projects.length, 1)
+    const [project] = organization.projects
+    assert.equal(project.name, 'Roadmap')
+    assert.equal(project.sectionId, section.id)
+    assert.equal(project.repositoryPath, null)
+
+    await click('New chat in Roadmap')
+    assert.equal(await evaluate('document.querySelector(".saved-transcript-header p").textContent'), 'Nova / Research / Roadmap')
+
+    await click('Add tab to Group 1')
+    await wait(() => evaluate('Boolean(document.querySelector(".agent-picker-create"))'), 'additional agent picker')
+    await click('New agent')
+    await fill(name, 'Aster')
+    await click('Create agent')
+    await close()
+    await wait(() => evaluate('document.querySelector("[data-region=explorer] [role=tab][aria-selected=true]").textContent === "Aster"'), 'new agent replaces its picker')
+    assert.deepEqual((await read('window.granite.agents.list()')).map(agent => agent.name).sort(), ['Aster', 'Nova'])
+
+    await fresh.quit()
+    await fresh.launch()
+    await wait(() => evaluate('Boolean(document.querySelector(".agent-picker-create"))'), 'agent picker after relaunch')
+    await click('Nova')
+    await wait(() => evaluate('Boolean(document.querySelector("[aria-label=\'New chat in Roadmap\']"))'), 'project survives relaunch')
+  } finally {
+    await fresh.quit()
+  }
+  console.log('Fresh-profile creation for agents, sections, and chat-only projects passed, including validation and relaunch.')
+}
+
 function seedProfile() {
   const code = `
     import { AgentRuntime } from './src/backend/agents/runtime.ts'
@@ -109,9 +196,9 @@ try {
     app.on('browser-window-created', (_event, window) => window.webContents.setBackgroundThrottling(false))
     require(${JSON.stringify(resolve('out/main/index.js'))})
   `)
-  const desktop = desktopSession(copy, 9462, { ELECTRON_RENDERER_URL: '' }, entry, undefined, {
-    ready: 'Boolean(document.querySelector(".workspace-app"))'
-  })
+  await verifyCreation(entry)
+
+  const desktop = workspaceSession(copy, entry)
   const { evaluate, click, fill, wait, rpc } = desktop
 
   async function point(selector, x = 0.5, y = 0.5) {

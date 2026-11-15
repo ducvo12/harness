@@ -91,6 +91,10 @@ section. Section and project controls open drafts at their own locations.
 The first send saves the chat in that location and keeps the same tab.
 Closing a draft before sending leaves no saved chat.
 
+Explorer can create agents from the agent picker, Shared or Closed sections
+for the selected agent, and chat-only projects within custom sections. A new
+agent opens in the Explorer tab that created it.
+
 Run `node scripts/verify-saved-chats-desktop.mjs` after a build.
 
 ### Before merging to main
@@ -98,9 +102,11 @@ Run `node scripts/verify-saved-chats-desktop.mjs` after a build.
 The next milestone is layout persistence.
 Before merging and making the workspace the default shell, verify all four:
 
-1. **Existing profiles.** Use a disposable copy of an existing Granite profile.
-   Confirm its agents, sections, projects, saved chats, and transcripts appear
-   in the new shell. The completed desktop check used a seeded profile.
+1. **Fresh and existing profiles.** Verify the first agent, section, and
+   project can be created from an empty profile. Use a disposable copy of an
+   existing Granite profile to confirm its agents, sections, projects, saved
+   chats, and transcripts appear in the new shell. The desktop check uses
+   disposable fresh and seeded profiles.
 2. **Daily chat workflows.** Verify Send, streaming, and Stop. Close and
    reopen a tab during an active run and confirm the run continues. Drag and
    resize panes with a long transcript and an active stream.

@@ -15,8 +15,16 @@ export function useSavedResource<Value>(load: () => Promise<Result<Value>>, fail
     return () => { current = false }
   }, [load, attempt, failure, revision])
 
+  function update(change: (value: Value) => Value) {
+    setSnapshot(current => {
+      if (current?.load !== load || current.attempt !== attempt || !current.result.ok) return current
+      return { ...current, result: { ok: true, value: change(current.result.value) } }
+    })
+  }
+
   return {
     result: snapshot?.load === load && snapshot.attempt === attempt ? snapshot.result : undefined,
-    retry: () => setAttempt(value => value + 1)
+    retry: () => setAttempt(value => value + 1),
+    update
   }
 }

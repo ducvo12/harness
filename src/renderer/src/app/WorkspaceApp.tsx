@@ -3,13 +3,15 @@ import '../styles/panes.css'
 import '../styles/saved-chats.css'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Agent, Conversation, ConversationDetail } from '../../../shared/agent'
-import type { SavedConnection } from '../../../shared/chat'
+import type { Result, SavedConnection } from '../../../shared/chat'
+import type { Section, SectionMode } from '../../../shared/organization'
 import Header from '../components/Header'
 import Workspace, { type LayoutUpdate } from '../components/panes/Workspace'
 import { createPane, findPane, updatePane, type Rect } from '../components/panes/layout'
 import { initialRegions, regionsMinimum, updateRegion, type RegionLayout } from '../components/panes/regions'
 import type { DraftChatDestination, Tab } from '../components/panes/tabs'
 import AgentExplorer, { AgentPicker } from '../features/organization/AgentExplorer'
+import WorkspaceCreationDialog from '../features/organization/WorkspaceCreationDialog'
 import type { ReadingPosition } from '../features/chat/SavedTranscript'
 import WorkspaceChat, { type ComposerDraft } from '../features/chat/WorkspaceChat'
 import Settings from '../features/connections/Settings'
@@ -24,6 +26,11 @@ interface WorkspaceState {
 }
 
 type DraftState = ComposerDraft & { creating?: boolean; error?: string }
+
+type Creation =
+  | { kind: 'agent'; pickerId?: string }
+  | { kind: 'section'; agentId: string }
+  | { kind: 'project'; section: Section }
 
 function nextGroup({ nextPane }: WorkspaceState) {
   return { id: `pane-${nextPane}`, title: `Group ${nextPane}` }
@@ -57,13 +64,14 @@ export default function WorkspaceApp() {
   const positions = useRef(new Map<string, ReadingPosition>())
   const [drafts, setDrafts] = useState(new Map<string, DraftState>())
   const creatingDrafts = useRef(new Set<string>())
-  const [chatRevisions, setChatRevisions] = useState(new Map<string, number>())
+  const [explorerRevisions, setExplorerRevisions] = useState(new Map<string, number>())
+  const [creation, setCreation] = useState<Creation>()
   const [selectedConnection, setSelectedConnection] = useState(() => localStorage.getItem('granite.connection') ?? '')
   const [editedConnections, setEditedConnections] = useState<SavedConnection[]>()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const settings = useRef<HTMLDialogElement>(null)
   const chatSession = useWorkspaceChats()
-  const { result: agents, retry: retryAgents } = useSavedResource(loadAgents, 'Could not load your agents.')
+  const { result: agents, retry: retryAgents, update: updateAgents } = useSavedResource(loadAgents, 'Could not load your agents.')
   const { result: savedConnections, retry: retryConnections } = useSavedResource(loadConnections, 'Could not load your connections.')
   const connections = editedConnections ? { ok: true as const, value: editedConnections } : savedConnections
   const defaultConnection = connections?.ok
@@ -135,7 +143,7 @@ export default function WorkspaceApp() {
   }
 
   function refreshExplorer(agentId: string) {
-    setChatRevisions(current => new Map(current).set(agentId, (current.get(agentId) ?? 0) + 1))
+    setExplorerRevisions(current => new Map(current).set(agentId, (current.get(agentId) ?? 0) + 1))
   }
 
   function changeLayout(update: LayoutUpdate) {
@@ -224,6 +232,24 @@ export default function WorkspaceApp() {
     })
   }
 
+  async function createEntry(action: Creation, name: string, mode: SectionMode): Promise<Result<unknown>> {
+    if (action.kind === 'agent') {
+      const result = await window.granite.agents.create(name)
+      if (result.ok) {
+        updateAgents(current => [...current, result.value])
+        chooseAgent(result.value, action.pickerId)
+      }
+      return result
+    }
+
+    const api = window.granite.organization
+    const result = action.kind === 'section'
+      ? await api.createSection(action.agentId, name, mode)
+      : await api.createProject(action.section.agentId, action.section.id, name)
+    if (result.ok) refreshExplorer(result.value.agentId)
+    return result
+  }
+
   function renderExplorer(agentId?: string, pickerId?: string) {
     if (!agents) return <p className="pane-message" role="status">Loading agents…</p>
     if (!agents.ok) return (
@@ -233,9 +259,15 @@ export default function WorkspaceApp() {
       </div>
     )
     const agent = agents.value.find(item => item.id === agentId)
-    return agent
-      ? <AgentExplorer key={pickerId} agent={agent} chatRevision={chatRevisions.get(agent.id) ?? 0} onOpenChat={openChat} onNewChat={newChat} />
-      : <AgentPicker key={pickerId} agents={agents.value} onChoose={chosen => chooseAgent(chosen, pickerId)} />
+    if (agent) {
+      return <AgentExplorer key={pickerId} agent={agent} revision={explorerRevisions.get(agent.id) ?? 0}
+        onOpenChat={openChat} onNewChat={newChat}
+        onNewSection={() => setCreation({ kind: 'section', agentId: agent.id })}
+        onNewProject={section => setCreation({ kind: 'project', section })} />
+    }
+
+    return <AgentPicker key={pickerId} agents={agents.value} onChoose={chosen => chooseAgent(chosen, pickerId)}
+      onNewAgent={() => setCreation({ kind: 'agent', pickerId })} />
   }
 
   function renderTab(tab: Tab) {
@@ -304,6 +336,12 @@ export default function WorkspaceApp() {
         newPane={nextGroup(state)}
         workspaceRef={workspace}
       />
+
+      {creation && (
+        <WorkspaceCreationDialog kind={creation.kind} sectionName={creation.kind === 'project' ? creation.section.name : undefined}
+          onCreate={(name, mode) => createEntry(creation, name, mode)}
+          onClose={() => setCreation(undefined)} />
+      )}
 
       {settingsOpen && connections?.ok && (
         <dialog className="workspace-connections" aria-label="Connections" ref={settings} onClose={() => setSettingsOpen(false)}>

@@ -6,9 +6,17 @@ import { useSavedResource } from '../../app/useSavedResource'
 import type { DraftChatDestination } from '../../components/panes/tabs'
 import TreeActionIcon from '../../components/TreeActionIcon'
 
-export function AgentPicker({ agents, onChoose }: { agents: Agent[]; onChoose: (agent: Agent) => void }) {
+export function AgentPicker({ agents, onChoose, onNewAgent }: {
+  agents: Agent[]
+  onChoose: (agent: Agent) => void
+  onNewAgent: () => void
+}) {
   return (
     <div className="agent-explorer" role="group" aria-label="Choose an agent">
+      <button type="button" className="agent-picker-create quiet-button" onClick={onNewAgent}>
+        New agent
+      </button>
+
       {agents.length === 0 && <p>No saved agents.</p>}
 
       {agents.map(agent => (
@@ -22,12 +30,14 @@ export function AgentPicker({ agents, onChoose }: { agents: Agent[]; onChoose: (
 
 interface AgentExplorerProps {
   agent: Agent
-  chatRevision: number
+  revision: number
   onOpenChat: (chat: Conversation, path: string[]) => void
   onNewChat: (destination: DraftChatDestination) => void
+  onNewSection: () => void
+  onNewProject: (section: Section) => void
 }
 
-export default function AgentExplorer({ agent, chatRevision, onOpenChat, onNewChat }: AgentExplorerProps) {
+export default function AgentExplorer({ agent, revision, onOpenChat, onNewChat, onNewSection, onNewProject }: AgentExplorerProps) {
   const agentId = agent.id
   const load = useCallback(async () => {
     const [organization, conversations] = await Promise.all([
@@ -38,7 +48,7 @@ export default function AgentExplorer({ agent, chatRevision, onOpenChat, onNewCh
     if (!conversations.ok) return conversations
     return { ok: true as const, value: { ...organization.value, chats: conversations.value } }
   }, [agentId])
-  const { result, retry } = useSavedResource(load, 'Could not load this agent’s chats.', chatRevision)
+  const { result, retry } = useSavedResource(load, 'Could not load this agent’s Explorer.', revision)
 
   if (!result) return <p className="pane-message" role="status">Loading chats…</p>
   if (!result.ok) return (
@@ -83,11 +93,17 @@ export default function AgentExplorer({ agent, chatRevision, onOpenChat, onNewCh
 
   return (
     <div className="agent-explorer">
-      {general && (
-        <button type="button" className="new-chat-button quiet-button" aria-label="New chat" title="New chat in General" onClick={() => startChat(general)}>
-          <span aria-hidden="true">+</span>New chat
+      <div className="agent-explorer-actions">
+        {general && (
+          <button type="button" className="new-chat-button quiet-button" aria-label="New chat" title="New chat in General" onClick={() => startChat(general)}>
+            <span aria-hidden="true">+</span>New chat
+          </button>
+        )}
+
+        <button type="button" className="quiet-button" onClick={onNewSection}>
+          New section
         </button>
-      )}
+      </div>
 
       {!sections.length && <p className="tree-empty">No saved sections.</p>}
 
@@ -105,6 +121,13 @@ export default function AgentExplorer({ agent, chatRevision, onOpenChat, onNewCh
             </summary>
 
             <div className="agent-tree-children">
+              {section.kind === 'custom' && (
+                <button type="button" className="tree-entry" aria-label={`New project in ${section.name}`} onClick={() => onNewProject(section)}>
+                  <TreeActionIcon plus />
+                  <span>New project</span>
+                </button>
+              )}
+
               {!children.length && <p className="tree-empty">No saved chats.</p>}
 
               {children.map(child => {
