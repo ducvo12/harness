@@ -124,11 +124,11 @@ export class AgentStore {
       .all(agentId) as Conversation[]
   }
 
-  create(agentId: string, location?: Partial<ConversationLocation>, retention: ChatRetention = 'permanent'): ConversationDetail {
+  create(agentId: string, location?: Partial<ConversationLocation>, retention: ChatRetention = 'permanent', id: string = randomUUID()): ConversationDetail {
     if (retention !== 'permanent' && retention !== 'temporary') throw new Error('Invalid chat retention.')
     const expiresAt = retention === 'temporary' ? Date.now() + 60 * 60 * 1000 : null
     const conversation = {
-      id: randomUUID(),
+      id,
       agentId,
       title: 'New conversation',
       updatedAt: Date.now(),
@@ -152,6 +152,32 @@ export class AgentStore {
     })()
 
     return { ...conversation, messages: [] }
+  }
+
+  acceptMessage(agentId: string, id: string, messageId: string, text: string, location?: ConversationLocation) {
+    return this.saver.db.transaction(() => {
+      const prior = this.saver.db.prepare('SELECT conversationId, data FROM messages WHERE id = ?').get(messageId) as
+        { conversationId: string; data: string } | undefined
+      if (prior) {
+        const message = JSON.parse(prior.data) as AgentMessage
+        if (prior.conversationId !== id || message.role !== 'user' || message.content !== text) {
+          throw new Error('This message ID is already in use.')
+        }
+        return this.get(agentId, id)
+      }
+
+      const chat = location ? this.create(agentId, location, 'permanent', id) : this.get(agentId, id)
+      this.saveUserMessage(chat, { id: messageId, role: 'user', content: text, delivery: 'pending' })
+      return this.get(agentId, id)
+    })()
+  }
+
+  saveUserMessage(chat: ConversationDetail, message: AgentMessage) {
+    if (!chat.messages.length && chat.title === 'New conversation') {
+      this.saver.db.prepare('UPDATE conversations SET title = ? WHERE id = ?')
+        .run(message.content.slice(0, 64), chat.id)
+    }
+    this.saveMessage(chat.id, message)
   }
 
   touchConversation(agentId: string, id: string, expiresAt: number | null) {

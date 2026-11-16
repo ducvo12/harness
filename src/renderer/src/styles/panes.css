@@ -1,0 +1,647 @@
+.workspace {
+  display: flex;
+  min-height: 0;
+  padding: 6px;
+}
+
+.region-layout {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.region-slot,
+.workspace-region {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.region-slot,
+.workspace-region {
+  position: relative;
+}
+
+.region-drag-handle {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 24px;
+  padding: 0;
+  border-color: transparent;
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.region-drag-handle:hover:not(:disabled) {
+  color: var(--text-strong);
+  background: var(--surface-hover);
+}
+
+.region-drag-handle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.region-empty {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
+
+.pane {
+  --pane-titlebar-height: 30px;
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 0 solid transparent;
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.pane-titlebar {
+  display: flex;
+  align-items: flex-end;
+  flex-shrink: 0;
+  height: var(--pane-titlebar-height);
+  padding: 0 6px 0 0;
+  gap: 4px;
+  background: var(--surface-inset);
+}
+
+.pane.has-region-handle .pane-titlebar {
+  padding-left: 24px;
+}
+
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface);
+}
+
+.pane-layout,
+.pane-split,
+.pane-slot {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane-layout {
+  position: relative;
+  border: 0 solid transparent;
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+  transition:
+    border-color var(--duration-normal) var(--ease-soft),
+    box-shadow var(--duration-normal) var(--ease-soft);
+}
+
+.pane-layout.is-framed {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-pane);
+}
+
+.pane-layout.is-separating .pane,
+.pane-floating {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pane);
+}
+
+.pane-layout.is-separating :where(.pane:not(.pane-floating)) {
+  transition:
+    border-radius var(--duration-normal) var(--ease-soft),
+    border-color var(--duration-normal) var(--ease-soft),
+    box-shadow var(--duration-normal) var(--ease-soft);
+}
+
+.workspace[data-transition] .pane,
+.workspace[data-transition] .pane-layout {
+  transition: none;
+}
+
+.pane-split-vertical {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pane-drag-handle {
+  flex: 1;
+  min-width: 8px;
+  align-self: stretch;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.workspace.is-dragging,
+.workspace.is-dragging .pane-drag-handle,
+.workspace.is-dragging .region-drag-handle {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.workspace.is-dragging .region-drag-handle {
+  pointer-events: none;
+}
+
+.pane-slot {
+  position: relative;
+}
+
+.pane-slot-dragging::before,
+.region-slot-dragging::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--focus);
+  border-radius: var(--radius-lg);
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-soft);
+}
+
+@starting-style {
+  .pane-slot-dragging::before,
+  .region-slot-dragging::before {
+    opacity: 0;
+  }
+}
+
+.pane-floating,
+.region-floating {
+  position: fixed;
+  z-index: 2;
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: none;
+  transition:
+    opacity var(--duration-fast) var(--ease-soft),
+    transform var(--duration-fast) var(--ease-soft);
+}
+
+@starting-style {
+  .pane-floating,
+  .region-floating {
+    opacity: 0.9;
+    transform: scale(0.985);
+  }
+}
+
+.pane-dock-preview {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  border: 2px solid var(--focus);
+  border-radius: var(--radius-lg);
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    left var(--duration-normal) var(--ease-soft),
+    top var(--duration-normal) var(--ease-soft),
+    width var(--duration-normal) var(--ease-soft),
+    height var(--duration-normal) var(--ease-soft),
+    opacity var(--duration-fast) var(--ease-soft),
+    transform var(--duration-fast) var(--ease-soft);
+}
+
+.pane > .pane-dock-preview {
+  inset: var(--pane-titlebar-height) 0 0;
+}
+
+.pane > .pane-dock-preview.is-left {
+  right: 50%;
+}
+
+.pane > .pane-dock-preview.is-right {
+  left: 50%;
+}
+
+.pane > .pane-dock-preview.is-top {
+  bottom: calc((100% - var(--pane-titlebar-height)) / 2);
+}
+
+.pane > .pane-dock-preview.is-bottom {
+  top: calc((100% + var(--pane-titlebar-height)) / 2);
+}
+
+@starting-style {
+  .pane-dock-preview {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.pane-split {
+  display: grid;
+}
+
+.pane-layout.is-separating .pane-split {
+  transition:
+    grid-template-columns var(--duration-normal) var(--ease-soft),
+    grid-template-rows var(--duration-normal) var(--ease-soft);
+}
+
+.pane-split-horizontal {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.pane-divider {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.region-layout > .pane-divider::before {
+  content: '';
+  position: absolute;
+  inset: 0 -2px;
+}
+
+.pane-split > .pane-divider {
+  background: var(--border);
+  transition: background var(--duration-normal) var(--ease-soft);
+}
+
+.pane-layout.is-separating .pane-split > .pane-divider {
+  background: transparent;
+}
+
+/* Keep internal subpanes visually flush while still giving dividers a comfortable grab target. */
+.pane-layout:not(.is-separating) .pane-split > .pane-divider::before {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;
+}
+
+.pane-layout:not(.is-separating) .pane-split-vertical > .pane-divider::before {
+  inset: -3px 0;
+}
+
+.pane-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 28px;
+  border-radius: var(--radius-sharp);
+  background: var(--focus);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-soft);
+}
+
+.pane-divider:hover::after,
+.pane-divider:focus-visible::after,
+.pane-divider.is-resizing::after {
+  opacity: 1;
+}
+
+.pane-divider:focus-visible {
+  outline: 1px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.pane-split > .pane-divider:focus-visible {
+  outline-offset: 0;
+  background: var(--focus);
+}
+
+.pane-split-vertical > .pane-divider {
+  cursor: row-resize;
+}
+
+.pane-split-vertical > .pane-divider::after {
+  width: 28px;
+  height: 2px;
+}
+
+.workspace.is-dragging .pane-divider {
+  pointer-events: none;
+}
+
+.workspace.is-resizing-horizontal,
+.workspace.is-resizing-horizontal * {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.workspace.is-resizing-vertical,
+.workspace.is-resizing-vertical * {
+  cursor: row-resize;
+  user-select: none;
+}
+
+.pane-close,
+.tab-add,
+.tab-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-color: transparent;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.pane-close,
+.tab-add {
+  align-self: center;
+}
+
+.pane-tabs {
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  padding: 0 var(--radius-sm);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.pane-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 160px;
+  min-width: 88px;
+  flex-shrink: 1;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: transparent;
+  transition:
+    background var(--duration-fast) var(--ease-soft),
+    border-radius var(--duration-fast) var(--ease-soft),
+    color var(--duration-fast) var(--ease-soft);
+}
+
+.pane-tab + .pane-tab {
+  margin-left: var(--radius-sm);
+}
+
+.pane-tab:hover:not(.is-active) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.pane-tab.is-active {
+  background: var(--surface);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  color: var(--text-strong);
+}
+
+.pane-tab::before,
+.pane-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: var(--radius-sm);
+  height: var(--radius-sm);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-soft);
+}
+
+.pane-tab.is-active::before,
+.pane-tab.is-active::after {
+  opacity: 1;
+}
+
+.pane-tab.is-active::before {
+  left: calc(-1 * var(--radius-sm));
+  background: radial-gradient(circle farthest-side at 0 0, transparent 92%, var(--surface) 100%);
+}
+
+.pane-tab.is-active::after {
+  right: calc(-1 * var(--radius-sm));
+  background: radial-gradient(circle farthest-side at 100% 0, transparent 92%, var(--surface) 100%);
+}
+
+.pane-tab [role='tab'] {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 6px 6px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  touch-action: none;
+  user-select: none;
+}
+
+.pane-tab [role='tab']:hover:not(:disabled) {
+  background: transparent;
+}
+
+.pane-tab button:focus-visible {
+  outline-offset: -2px;
+}
+
+.tab-close {
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  border-radius: var(--radius-sharp);
+  font-size: 15px;
+}
+
+.pane-tab.is-dragging {
+  border: 1px dashed var(--focus);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: transparent;
+}
+
+.pane-tab.is-dragging::before,
+.pane-tab.is-dragging::after {
+  display: none;
+}
+
+.pane-tab.is-dragging > * {
+  visibility: hidden;
+}
+
+.tab-drag-preview {
+  position: fixed;
+  z-index: 4;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-strong);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  box-shadow: var(--shadow-pane);
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: none;
+  transition:
+    opacity var(--duration-fast) var(--ease-soft),
+    transform var(--duration-fast) var(--ease-soft);
+}
+
+@starting-style {
+  .tab-drag-preview {
+    opacity: 0.9;
+    transform: scale(0.97);
+  }
+}
+
+.tab-drop-marker {
+  position: absolute;
+  z-index: 5;
+  background: var(--accent);
+  opacity: 1;
+  transform: scaleY(1);
+  pointer-events: none;
+  transition:
+    left var(--duration-fast) var(--ease-soft),
+    top var(--duration-fast) var(--ease-soft),
+    height var(--duration-fast) var(--ease-soft),
+    opacity var(--duration-fast) var(--ease-soft),
+    transform var(--duration-fast) var(--ease-soft);
+}
+
+@starting-style {
+  .tab-drop-marker {
+    opacity: 0;
+    transform: scaleY(0.6);
+  }
+}
+
+.workspace[data-transition='regions'] .workspace-region {
+  view-transition-name: var(--vt);
+  view-transition-class: vt-region;
+}
+
+.workspace[data-transition='groups'] .pane,
+.workspace[data-transition='groups'] .region-empty {
+  view-transition-name: var(--vt);
+  view-transition-class: vt-pane;
+}
+
+.pane-titlebar[data-transition='tabs'] .pane-tab:not(.is-dragging),
+.pane-titlebar[data-transition='tabs'] .tab-add,
+.pane-titlebar[data-transition='tabs'] .pane-close {
+  view-transition-name: var(--vt);
+  view-transition-class: vt-tab;
+}
+
+.pane-titlebar[data-transition='tabs'] .pane-tabs {
+  view-transition-name: var(--vt);
+  view-transition-group: contain;
+  view-transition-class: vt-tab-strip;
+}
+
+.pane-titlebar::view-transition-group-children(.vt-tab-strip) {
+  overflow: clip;
+}
+
+.workspace::view-transition,
+.pane-titlebar::view-transition {
+  pointer-events: none;
+}
+
+.workspace::view-transition-group(.vt-region),
+.workspace::view-transition-group(.vt-pane) {
+  overflow: clip;
+}
+
+.workspace::view-transition-old(.vt-region):not(:only-child),
+.workspace::view-transition-new(.vt-region):not(:only-child),
+.workspace::view-transition-old(.vt-pane):not(:only-child),
+.workspace::view-transition-new(.vt-pane):not(:only-child) {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+}
+
+.workspace::view-transition-group(root),
+.workspace::view-transition-group(.vt-region),
+.workspace::view-transition-group(.vt-pane),
+.pane-titlebar::view-transition-group(root),
+.pane-titlebar::view-transition-group(.vt-tab-strip),
+.pane-titlebar::view-transition-group(.vt-tab) {
+  animation-duration: var(--duration-normal);
+  animation-timing-function: var(--ease-soft);
+}
+
+.workspace::view-transition-new(.vt-pane):only-child,
+.pane-titlebar::view-transition-new(.vt-tab):only-child {
+  animation: vt-enter var(--duration-normal) var(--ease-soft);
+}
+
+.workspace::view-transition-old(.vt-pane):only-child,
+.pane-titlebar::view-transition-old(.vt-tab):only-child {
+  animation: vt-exit var(--duration-fast) var(--ease-exit) forwards;
+}
+
+@keyframes vt-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes vt-exit {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pane-layout.is-separating .pane-split,
+  .pane-dock-preview,
+  .tab-drop-marker,
+  .pane-floating,
+  .region-floating,
+  .tab-drag-preview {
+    transform: none;
+    transition: opacity var(--duration-fast) var(--ease-soft);
+  }
+
+  .workspace::view-transition-group(*),
+  .workspace::view-transition-old(*),
+  .workspace::view-transition-new(*),
+  .pane-titlebar::view-transition-group(*),
+  .pane-titlebar::view-transition-old(*),
+  .pane-titlebar::view-transition-new(*) {
+    animation: none !important;
+  }
+}

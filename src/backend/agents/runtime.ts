@@ -297,6 +297,12 @@ export class AgentRuntime {
     }
   }
 
+  async acceptMessage(agentId: string, id: string, messageId: string, text: string, location?: ConversationLocation) {
+    await this.registry.get(agentId)
+    if (this.changingAgents) throw new Error('Finish the current operation before sending a message.')
+    return this.store.acceptMessage(agentId, id, messageId, text.trim(), location)
+  }
+
   async organization(agentId: string) {
     await this.registry.get(agentId)
     return this.store.organization.snapshot(agentId)
@@ -616,18 +622,22 @@ export class AgentRuntime {
 
   async run(
     requestId: string, agentId: string, conversationId: string, connection: Connection,
-    text: string, emit: (delta: StreamDelta) => void, intent: RunIntent = 'message'
+    text: string, emit: (delta: StreamDelta) => void, intent: RunIntent = 'message', messageId?: string
   ) {
     if (this.editingIdentity || this.changingAgents) throw new Error('Finish the current settings operation first.')
     if (typeof text !== 'string' || (intent === 'message' && !text.trim()) || text.length > 32_000 ||
         typeof requestId !== 'string' || !requestId || requestId.length > 100 ||
-        !['message', 'continue', 'pending'].includes(intent) || !connection.model ||
+        !['message', 'continue', 'pending', 'accepted'].includes(intent) || !connection.model ||
         connection.maxConcurrentRequests !== undefined && (!Number.isInteger(connection.maxConcurrentRequests) || connection.maxConcurrentRequests < 1 || connection.maxConcurrentRequests > 32)) {
       throw new Error('Invalid or oversized message.')
     }
     if (connection.provider === 'codex') throw new Error('Reconnect this legacy connection with ChatGPT or a Responses API connection.')
     if (this.store.runs.list().some(run => run.id === requestId)) throw new Error('This request has already been accepted.')
-    this.validateLocation(agentId, conversationId)
+    const conversation = this.validateLocation(agentId, conversationId)
+    const accepted = intent === 'accepted' ? conversation.messages.find(message =>
+      message.id === messageId && message.id !== requestId && message.role === 'user' && message.delivery === 'pending' && !message.runId
+    ) : undefined
+    if (intent === 'accepted' && !accepted) throw new Error('This message is no longer waiting for a reply.')
     this.store.runs.bind(agentId, conversationId, connection)
     try {
       if (this.store.get(agentId, conversationId).retention === 'temporary') {
@@ -636,8 +646,8 @@ export class AgentRuntime {
     } catch {}
     const current = this.chats.get(conversationId)
     if (current?.accepting && current.run.phase !== 'stopping') {
-      if (intent !== 'message') throw new Error('This chat already has pending or active work.')
-      const message = this.store.runs.append(current.run, text.trim())
+      if (intent !== 'message' && !accepted) throw new Error('This chat already has pending or active work.')
+      const message = accepted ? this.store.runs.adopt(current.run, accepted) : this.store.runs.append(current.run, text.trim())
       const projectId = this.store.get(agentId, conversationId).projectId
       if (projectId) this.authorization.message(current.run.id, agentId, conversationId, projectId, message)
       this.publishMessages(current)
@@ -648,7 +658,8 @@ export class AgentRuntime {
       }
       return { stopped: false, steered: true, runId: current.run.id }
     }
-    const existing = intent === 'pending' ? this.store.get(agentId, conversationId).messages.filter(message => message.delivery === 'pending') : []
+    const existing = intent === 'pending' ? conversation.messages.filter(message => message.delivery === 'pending')
+      : accepted ? [accepted] : []
     if (intent === 'pending' && !existing.length) throw new Error('There are no pending messages to run.')
     if (intent === 'continue' && ![...this.store.get(agentId, conversationId).messages].reverse().find(message => message.role === 'assistant')?.interrupted) {
       throw new Error('There is no interrupted reply to continue.')

@@ -14,7 +14,7 @@ import { realpath, stat } from 'node:fs/promises'
 import { RepositoryEditors } from './repository-editors'
 import { ConnectionUsageStore, type UsageBinding } from '../backend/connections/usage'
 
-export function registerIpc(directory: string) {
+export function registerIpc(directory: string, legacyShell: boolean) {
   const ipcMain = {
     handle<Key extends keyof IpcCalls>(channel: Key, listener: (event: Electron.IpcMainInvokeEvent, ...args: Parameters<IpcCalls[Key]>) => Promise<Awaited<ReturnType<IpcCalls[Key]>>> | Awaited<ReturnType<IpcCalls[Key]>>) {
       main.handle(channel, listener)
@@ -32,11 +32,12 @@ export function registerIpc(directory: string) {
   const modelCatalog = new AccountModelCatalog(chatgpt)
   const apiMetadata = new Map<string, import('../shared/chat').ModelOption[]>()
   const repositoryEditors = new RepositoryEditors(directory)
-  // Start discovery before the window opens. Model pickers and messages share
-  // this request; later messages use the session's cached result.
-  void store.list().then(connections => modelCatalog.warm(connections
-    .filter(connection => connection.provider === 'chatgpt' && connection.accountId)
-    .map(connection => connection.accountId!))).catch(() => {})
+  // Legacy model pickers share a catalog warmed at startup. The workspace loads it on demand.
+  if (legacyShell) {
+    void store.list().then(connections => modelCatalog.warm(connections
+      .filter(connection => connection.provider === 'chatgpt' && connection.accountId)
+      .map(connection => connection.accountId!))).catch(() => {})
+  }
   app.on('before-quit', () => chatgpt.cancel())
   const usage = new ConnectionUsageStore()
   const publishUsage = () => {
@@ -64,6 +65,20 @@ export function registerIpc(directory: string) {
       throw new Error('Invalid sender')
     }
   }
+
+  // Apply only to the requesting window; account for native frame dimensions.
+  ipcMain.handle('window:setMinimumSize', (event, width, height) => {
+    trusted(event)
+    return safely(async () => {
+      if (![width, height].every(value => Number.isInteger(value) && value > 0 && value < 2 ** 31)) {
+        throw new Error('Invalid window minimum size.')
+      }
+      const window = BrowserWindow.fromWebContents(event.sender)!
+      const outer = window.getBounds()
+      const content = window.getContentBounds()
+      window.setMinimumSize(Math.max(720, width + outer.width - content.width), Math.max(520, height + outer.height - content.height))
+    })
+  })
 
   async function repositoryFolder(agentId: unknown, projectId: unknown) {
     if (typeof agentId !== 'string' || !agentId || agentId.length > 100 || typeof projectId !== 'string' || !projectId || projectId.length > 100) throw new Error('Choose a repository project.')
@@ -324,7 +339,6 @@ export function registerIpc(directory: string) {
     'conversations:list': { action: 'list', limits: [64] },
     'conversations:keep': { action: 'keep', limits: [64, 100] },
     'conversations:rename': { action: 'rename', limits: [64, 100, 200] },
-    'conversations:delete': { action: 'delete', limits: [64, 100] },
     'conversations:get': { action: 'get', limits: [64, 100] },
     'context:read': { action: 'context:read', limits: [64, 100, 512] },
     'workspace:entries': { action: 'entries', limits: [64, 1024] },
@@ -344,6 +358,29 @@ export function registerIpc(directory: string) {
     trusted(event)
     if (typeof agentId !== 'string' || agentId.length > 64 || !validLocation(location, true) || (retention !== 'permanent' && retention !== 'temporary')) return { ok: false, error: 'Invalid chat location.' }
     return agents.call('create', agentId, location, retention)
+  })
+  ipcMain.handle('conversations:delete', async (event, agentId, id) => {
+    trusted(event)
+    if (typeof agentId !== 'string' || agentId.length > 64 || typeof id !== 'string' || id.length > 100) {
+      return { ok: false, error: 'Invalid chat.' }
+    }
+    const result = await agents.call('delete', agentId, id)
+    if (result.ok) {
+      for (const window of BrowserWindow.getAllWindows()) window.webContents.send('conversations:deleted', agentId, id)
+    }
+    return result
+  })
+  ipcMain.handle('conversations:acceptMessage', (event, agentId, id, messageId, text, location) => {
+    trusted(event)
+    if (quitting || typeof agentId !== 'string' || !agentId || agentId.length > 64 ||
+        typeof id !== 'string' || !id || id.length > 100 ||
+        typeof messageId !== 'string' || !messageId || messageId.length > 100 ||
+        typeof text !== 'string' || !text.trim() || text.length > 32_000 ||
+        (location !== undefined && !validLocation(location))) {
+      return { ok: false, error: 'Invalid message or chat location.' }
+    }
+
+    return agents.call('acceptMessage', agentId, id, messageId, text, location)
   })
   ipcMain.handle('conversations:move', (event, agentId, id, location) => {
     trusted(event)
@@ -410,7 +447,8 @@ export function registerIpc(directory: string) {
       text: string,
       model?: string,
       effort?: string,
-      intent: RunIntent = 'message'
+      intent: RunIntent = 'message',
+      messageId?: string
     ) => {
       trusted(event)
 
@@ -425,7 +463,8 @@ export function registerIpc(directory: string) {
           typeof agentId !== 'string' ||
           agentId.length > 64 || conversationId.length > 100 ||
           typeof text !== 'string' || text.length > 32_000 ||
-          !['message', 'continue', 'pending'].includes(intent)
+          !['message', 'continue', 'pending', 'accepted'].includes(intent) ||
+          (intent === 'accepted' && (typeof messageId !== 'string' || !messageId || messageId.length > 100 || messageId === requestId))
         ) {
           return { ok: false, error: 'This request is invalid or has already been accepted.' }
         }
@@ -456,7 +495,7 @@ export function registerIpc(directory: string) {
             return { ok: true, value: { stopped: true } }
           }
 
-          const result = await agents.call('run', requestId, agentId, conversationId, connection, text, intent)
+          const result = await agents.call('run', requestId, agentId, conversationId, connection, text, intent, messageId)
           // Refresh availability, but never replay a run or its completed tools.
           await modelCatalog.refreshAfterError(connection, result)
           return result

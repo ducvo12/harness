@@ -9,12 +9,13 @@ void app.whenReady().then(() => {
     app.setPath('userData', join(app.getPath('appData'), 'Granite Development'))
   }
 
-  registerIpc(app.getPath('userData'))
+  const legacyShell = app.commandLine.hasSwitch('legacy-shell')
+  registerIpc(app.getPath('userData'), legacyShell)
 
-  createWindow()
+  createWindow(legacyShell)
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
+      createWindow(legacyShell)
     }
   })
 })

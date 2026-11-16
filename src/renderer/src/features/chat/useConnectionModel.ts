@@ -1,5 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
+import type { AgentMessage } from '../../../../shared/agent'
 import type { ModelOption, SavedConnection } from '../../../../shared/chat'
+import type { RunSnapshot } from '../../../../shared/run'
+
+export function chatModelBinding(connections: SavedConnection[], selectedId: string, messages: AgentMessage[], run?: RunSnapshot) {
+  const locked = messages.find(message => message.model)
+  const connectionId = locked?.connectionId ?? run?.connectionId ??
+    (locked ? connections.find(item => item.model === locked.model)?.id : selectedId)
+  return {
+    connection: connections.find(item => item.id === connectionId),
+    model: locked?.model ?? run?.model,
+    effort: [...messages].reverse().find(message => message.model)?.effort
+  }
+}
 
 export function useConnectionModel(connection: SavedConnection | undefined, lockedModel?: string, conversationId = '', savedEffort?: string) {
   const contextLimits = useRef(new Map<string, { contextWindow?: number; maxOutputTokens?: number }>())

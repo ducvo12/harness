@@ -13,6 +13,9 @@ const ipcRenderer = {
 
 contextBridge.exposeInMainWorld('granite', {
   platform: process.platform,
+  window: {
+    setMinimumSize: (width, height) => ipcRenderer.invoke('window:setMinimumSize', width, height)
+  },
   agents: {
     list: () => ipcRenderer.invoke('agents:list'),
     create: name => ipcRenderer.invoke('agents:create', name),
@@ -57,10 +60,17 @@ contextBridge.exposeInMainWorld('granite', {
     saveResponseDuration: (agentId, id, messageId, durationMs) => ipcRenderer.invoke('conversations:responseDuration', agentId, id, messageId, durationMs),
     list: agentId => ipcRenderer.invoke('conversations:list', agentId),
     create: (agentId, location, retention) => ipcRenderer.invoke('conversations:create', agentId, location, retention),
+    acceptMessage: (agentId, id, messageId, text, location) =>
+      ipcRenderer.invoke('conversations:acceptMessage', agentId, id, messageId, text, location),
     keep: (agentId, id) => ipcRenderer.invoke('conversations:keep', agentId, id),
     move: (agentId, id, location) => ipcRenderer.invoke('conversations:move', agentId, id, location),
     rename: (agentId, id, title) => ipcRenderer.invoke('conversations:rename', agentId, id, title),
     delete: (agentId, id) => ipcRenderer.invoke('conversations:delete', agentId, id),
+    onDeleted: callback => {
+      const listener = (_event: Electron.IpcRendererEvent, agentId: string, id: string) => callback(agentId, id)
+      ipcRenderer.on('conversations:deleted', listener)
+      return () => ipcRenderer.removeListener('conversations:deleted', listener)
+    },
     get: (agentId, id) => ipcRenderer.invoke('conversations:get', agentId, id)
   },
   organization: {
@@ -107,8 +117,8 @@ contextBridge.exposeInMainWorld('granite', {
     dismissRecovery: () => ipcRenderer.invoke('runs:dismissRecovery'),
     cancelPending: (agentId, id) => ipcRenderer.invoke('runs:cancelPending', agentId, id)
   },
-  stream: (requestId, agentId, conversationId, connectionId, text, model, effort, intent) =>
-    ipcRenderer.invoke('model:stream', requestId, agentId, conversationId, connectionId, text, model, effort, intent),
+  stream: (requestId, agentId, conversationId, connectionId, text, model, effort, intent, messageId) =>
+    ipcRenderer.invoke('model:stream', requestId, agentId, conversationId, connectionId, text, model, effort, intent, messageId),
   stop: requestId => ipcRenderer.invoke('model:stop', requestId),
   onDelta: callback => {
     const listener = (_event: Electron.IpcRendererEvent, delta: StreamDelta) => callback(delta)

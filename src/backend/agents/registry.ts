@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { link, lstat, mkdir, readdir, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { defaultIdentity, type Agent } from '../../shared/agent.ts'
+import { isWorkspaceMarkdown } from '../../shared/workspace-markdown.ts'
 import { AgentFilesystem } from '../workspace/filesystem.ts'
 import { createWorkspace, workspaceText } from '../workspace/workspace.ts'
 import { locked, publishText } from '../context/files.ts'
@@ -180,10 +181,10 @@ export class AgentRegistry {
 
   async saveMarkdown(id: string, path: string, content: string, expected: string | null) {
     if (path === '/identity.md' && typeof expected === 'string') return this.saveIdentity(id, content, expected)
-    if (typeof path !== 'string' || !/^\/(memory\.md|notes\/.+\.md)$/.test(path) ||
+    if (typeof path !== 'string' || !isWorkspaceMarkdown(path) ||
         typeof content !== 'string' || content.length > 100_000 || content.includes('\0') ||
         !(expected === null || typeof expected === 'string')) {
-      throw new Error('Choose a Markdown file in memory or notes (up to 100,000 characters).')
+      throw new Error('Choose a workspace Markdown file (up to 100,000 characters).')
     }
     const workspace = await this.workspace(id)
     await workspace.check(path)

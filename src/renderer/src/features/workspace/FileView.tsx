@@ -1,75 +1,139 @@
 import { useEffect, useState } from 'react'
 import type { Agent } from '../../../../shared/agent'
+import { isWorkspaceMarkdown } from '../../../../shared/workspace-markdown'
 import FormattedResponse from '../chat/FormattedResponse'
 
-export default function FileView({ agent, path, busy, onDirty, onSaved }: {
-  agent: Agent; path: string; busy: boolean; onDirty: (value: boolean) => void; onSaved: () => void
-}) {
+export interface FileDraft {
+  original: string
+  text: string
+  saving?: boolean
+  error?: string
+}
+
+interface FileViewProps {
+  agent: Agent
+  path: string
+  busy?: boolean
+  onDirty?: (value: boolean) => void
+  onSaved?: () => void
+  edit?: { draft: FileDraft | undefined; setDraft: (draft: FileDraft | undefined) => void }
+}
+
+export default function FileView({ agent, path, busy, onDirty, onSaved, edit }: FileViewProps) {
   const [original, setOriginal] = useState('')
-  const [text, setText] = useState('')
-  const [editing, setEditing] = useState(false)
+  const [localDraft, setLocalDraft] = useState<FileDraft>()
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [readError, setReadError] = useState('')
   const [revision, setRevision] = useState(0)
-  const dirty = text !== original
-  const editable = path === '/identity.md' || path === '/memory.md' || path.startsWith('/notes/') && path.endsWith('.md')
-  useEffect(() => { onDirty(dirty || saving); return () => onDirty(false) }, [dirty, saving, onDirty])
+  const draft = edit ? edit.draft : localDraft
+  const setDraft = edit ? edit.setDraft : setLocalDraft
+  const editing = Boolean(draft)
+  const dirty = Boolean(draft && draft.text !== draft.original)
+  const saving = Boolean(draft?.saving)
+  const error = draft ? draft.error : readError
+
   useEffect(() => {
+    onDirty?.(dirty || saving)
+    return () => onDirty?.(false)
+  }, [dirty, saving, onDirty])
+
+  useEffect(() => {
+    if (editing) return
     let current = true
     setLoading(true)
     void window.granite.workspace.read(agent.id, path).then(result => {
       if (!current) return
-      if (result.ok) { setOriginal(result.value); setText(result.value); setError('') }
-      else setError(result.error)
-    }).catch(() => { if (current) setError('Could not load this file.') })
-      .finally(() => { if (current) setLoading(false) })
+      if (result.ok) {
+        setOriginal(result.value)
+        setReadError('')
+      } else {
+        setReadError(result.error)
+      }
+    }).catch(() => {
+      if (current) setReadError('Could not load this file.')
+    }).finally(() => {
+      if (current) setLoading(false)
+    })
     return () => { current = false }
-  }, [agent.id, path, revision])
+  }, [agent.id, path, revision, editing])
 
   async function save() {
-    if (busy || loading || saving || !dirty) return
-    setSaving(true)
-    setError('')
+    if (!draft || busy || saving || !dirty) return
+    setDraft({ ...draft, saving: true, error: undefined })
     try {
-      const result = await window.granite.workspace.save(agent.id, path, text, original)
-      if (!result.ok) { setError(result.error); return }
-      setOriginal(result.value); setText(result.value); setEditing(false); onSaved()
-    } catch { setError('Could not save this file. Your draft is still here.') }
-    finally { setSaving(false) }
+      const result = await window.granite.workspace.save(agent.id, path, draft.text, draft.original)
+      if (!result.ok) {
+        setDraft({ ...draft, saving: false, error: result.error })
+        return
+      }
+      setOriginal(result.value)
+      setDraft(undefined)
+      onSaved?.()
+    } catch {
+      setDraft({ ...draft, saving: false, error: 'Could not save this file. Your draft is still here.' })
+    }
   }
-  return <main className="file-main">
-    <header className="file-heading">
-      <div className="file-breadcrumb" title={`${agent.name}${path}`}>{agent.name} / {path.slice(1)}{dirty && <span className="file-dirty"> · Unsaved</span>}</div>
-      <div className="file-actions">
-        {editing ? <>
-          <button className="quiet-button" disabled={saving} onClick={() => { setText(original); setEditing(false); setError('') }}>Cancel</button>
-          <button disabled={busy || loading || saving || !dirty} onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</button>
-        </> : <>
-          <button className="quiet-button" disabled={loading} onClick={() => setRevision(value => value + 1)}>Refresh</button>
-          {editable && <button className="quiet-button" disabled={busy || loading || Boolean(error)} onClick={() => setEditing(true)}>Edit</button>}
-        </>}
-      </div>
-    </header>
-    {error && <div className="file-error error" role="alert">{error}
-      {editing && <button className="quiet-button" disabled={saving} onClick={() => { setText(original); setEditing(false); setRevision(value => value + 1) }}>Discard draft and reload</button>}
-    </div>}
-    {editing ? <div className="file-editor-wrap">
-      <textarea className="file-editor" aria-label={`Edit ${path.split('/').at(-1)}`} autoFocus spellCheck={false}
-        value={text} maxLength={path === '/identity.md' ? 32_000 : 100_000} disabled={saving}
-        onChange={event => setText(event.target.value)} onKeyDown={event => {
-          if ((event.metaKey || event.ctrlKey) && event.key === 's') { event.preventDefault(); void save() }
-          if (event.key === 'Tab') {
-            event.preventDefault()
-            const element = event.currentTarget
-            const start = element.selectionStart, end = element.selectionEnd
-            setText(text.slice(0, start) + '  ' + text.slice(end))
-            requestAnimationFrame(() => { element.selectionStart = element.selectionEnd = start + 2 })
-          }
-        }} />
-      <div className="file-editor-status">Markdown · {text.split('\n').length} lines · {text.length.toLocaleString()} characters</div>
-    </div> : <section className="file-preview" aria-label="File preview" aria-busy={loading}>
-      {loading ? <p>Loading…</p> : !error && (path.endsWith('.md') ? <FormattedResponse text={text || '*This file is empty.*'} /> : <pre>{text}</pre>)}
-    </section>}
-  </main>
+
+  return (
+    <main className="file-main">
+      <header className="file-heading">
+        <div className="file-breadcrumb" title={`${agent.name}${path}`}>
+          {agent.name} / {path.slice(1)}{dirty && <span className="file-dirty"> · Unsaved</span>}
+        </div>
+
+        <div className="file-actions">
+          {draft ? (
+            <>
+              <button className="quiet-button" disabled={saving} onClick={() => setDraft(undefined)}>Cancel</button>
+
+              <button disabled={busy || saving || !dirty} onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</button>
+            </>
+          ) : (
+            <>
+              <button className="quiet-button" disabled={loading} onClick={() => setRevision(value => value + 1)}>Refresh</button>
+
+              {isWorkspaceMarkdown(path) && (
+                <button className="quiet-button" disabled={busy || loading || Boolean(error)}
+                  onClick={() => setDraft({ original, text: original })}>Edit</button>
+              )}
+            </>
+          )}
+        </div>
+      </header>
+
+      {error && (
+        <div className="file-error error" role="alert">
+          {error}
+          {draft && <button className="quiet-button" disabled={saving} onClick={() => setDraft(undefined)}>Discard draft and reload</button>}
+        </div>
+      )}
+
+      {draft ? (
+        <div className="file-editor-wrap">
+          <textarea className="file-editor" aria-label={`Edit ${path.split('/').at(-1)}`} autoFocus spellCheck={false}
+            value={draft.text} maxLength={path === '/identity.md' ? 32_000 : 100_000} disabled={saving}
+            onChange={event => setDraft({ ...draft, text: event.target.value })} onKeyDown={event => {
+              if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+                event.preventDefault()
+                void save()
+              }
+              if (event.key === 'Tab') {
+                event.preventDefault()
+                const element = event.currentTarget
+                const start = element.selectionStart
+                const end = element.selectionEnd
+                setDraft({ ...draft, text: draft.text.slice(0, start) + '  ' + draft.text.slice(end) })
+                requestAnimationFrame(() => element.setSelectionRange(start + 2, start + 2))
+              }
+            }} />
+
+          <div className="file-editor-status">Markdown · {draft.text.split('\n').length} lines · {draft.text.length.toLocaleString()} characters</div>
+        </div>
+      ) : (
+        <section className="file-preview" aria-label="File preview" aria-busy={loading}>
+          {loading ? <p>Loading…</p> : !error && (path.endsWith('.md') ? <FormattedResponse text={original || '*This file is empty.*'} /> : <pre>{original}</pre>)}
+        </section>
+      )}
+    </main>
+  )
 }

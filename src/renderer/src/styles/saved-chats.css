@@ -1,0 +1,144 @@
+.agent-explorer,
+.pane-message {
+  width: 100%;
+  padding: 12px;
+}
+
+.agent-explorer summary {
+  padding: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.agent-tree-new-chat {
+  float: inline-end;
+}
+
+.agent-picker-create {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.agent-explorer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.agent-explorer-actions .new-chat-button {
+  flex: 1;
+  width: auto;
+  margin: 0;
+}
+
+.agent-explorer .tree-entry {
+  font-family: var(--font-sans);
+  border-radius: var(--radius-sm);
+}
+
+.agent-markdown-files {
+  margin-bottom: 12px;
+}
+
+.agent-tree-children {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.saved-transcript {
+  height: 100%;
+  overflow: auto;
+  overflow-anchor: none;
+  padding: 16px;
+  font-family: var(--font-sans);
+  overflow-wrap: anywhere;
+}
+
+.saved-transcript-header {
+  margin-bottom: 18px;
+}
+
+.saved-transcript-header p {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.saved-transcript-header h1 {
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.saved-message {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.saved-user-message {
+  white-space: pre-wrap;
+}
+
+.saved-message-status {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.workspace-chat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-chat > .pane-message,
+.workspace-chat > .saved-transcript {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 3rem;
+}
+
+.workspace-chat .composer-area {
+  flex: none;
+  padding: 0 8px 8px;
+}
+
+.workspace-chat .activity-section-content {
+  max-height: 8rem;
+  overflow: auto;
+}
+
+.workspace-connections {
+  width: min(48rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pane);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.workspace-creation {
+  max-width: calc(100% - 2rem);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pane);
+  color: var(--text);
+}
+
+.workspace-creation::backdrop {
+  background: color-mix(in srgb, var(--overlay) 70%, transparent);
+}
+
+.workspace-app .file-main {
+  height: 100%;
+}
+
+.workspace-app .file-heading {
+  padding-inline: 12px;
+}
+
+.workspace-app .file-breadcrumb,
+.workspace-app .file-editor {
+  font-family: var(--font-mono);
+}
