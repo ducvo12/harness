@@ -58,6 +58,7 @@ const provider = createServer(async (request, response) => {
 
 function workspaceSession(profile, entry) {
   return desktopSession(profile, 9462, { ELECTRON_RENDERER_URL: '' }, entry, undefined, {
+    legacyShell: false,
     ready: 'Boolean(document.querySelector(".workspace-app"))'
   })
 }
@@ -359,7 +360,6 @@ try {
   await writeFile(entry, `
     const { app } = require('electron')
     process.on('SIGTERM', () => app.quit())
-    app.commandLine.appendSwitch('workspace')
     app.on('browser-window-created', (_event, window) => window.webContents.setBackgroundThrottling(false))
     require(${JSON.stringify(resolve('out/main/index.js'))})
   `)

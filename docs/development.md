@@ -39,12 +39,10 @@ fail instead of being silently ignored.
 
 ## Saved-chat workspace
 
-`connect-explorer` starts from `main` and ports the window system from
-`rebuild`. The existing Granite shell is the default for `npm run dev`. To
-open the opt-in workspace, run `npm run dev -- -- --workspace`, or
-`npm run preview -- -- --workspace` after a build. The first `--` forwards
-arguments through npm, the second forwards them through electron-vite, and
-`--workspace` selects the new shell for that launch.
+The workspace is Granite’s default shell. Run `npm run dev`, or run
+`npm run preview` after building. To open the legacy shell for a launch,
+use `npm run dev -- -- --legacy-shell` or `npm run preview -- -- --legacy-shell`.
+The two separators forward the flag through npm and electron-vite.
 
 ### Confirmed on rebuild
 
@@ -108,7 +106,7 @@ Run `node scripts/verify-saved-chats-desktop.mjs` after a build.
 
 ### Before merging to main
 
-Before merging and making the workspace the default shell, verify all four:
+Before merging the workspace into `main`, verify all four:
 
 1. **Fresh and existing profiles.** Verify the first agent, section, and
    project can be created from an empty profile. Use a disposable copy of an

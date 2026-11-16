@@ -2,8 +2,7 @@ import { app, BrowserWindow, dialog, shell } from 'electron'
 import { join } from 'node:path'
 import { externalWebUrl } from './web-links'
 
-export function createWindow(): void {
-  const workspace = app.commandLine.hasSwitch('workspace')
+export function createWindow(legacyShell: boolean): void {
   const window = new BrowserWindow({
     width: 1120,
     height: 760,
@@ -38,9 +37,9 @@ export function createWindow(): void {
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     const url = new URL(process.env.ELECTRON_RENDERER_URL)
-    if (workspace) url.hash = 'workspace'
+    url.hash = legacyShell ? 'legacy-shell' : ''
     void window.loadURL(url.href)
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'), workspace ? { hash: 'workspace' } : undefined)
+    void window.loadFile(join(__dirname, '../renderer/index.html'), legacyShell ? { hash: 'legacy-shell' } : undefined)
   }
 }

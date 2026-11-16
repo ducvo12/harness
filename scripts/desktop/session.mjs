@@ -2,8 +2,9 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 
-// The optional final argument supplies short deadlines and transport fakes for lifecycle tests.
+// Existing desktop checks target the legacy shell unless they explicitly test the workspace.
 export function desktopSession(directory, port, environment = {}, entry = '.', executable, options = {}) {
+  const legacyShell = options.legacyShell ?? true
   const timeout = options.timeout ?? 20_000
   const shutdownTimeout = options.shutdownTimeout ?? 2_000
   const startProcess = options.spawn ?? spawn
@@ -127,7 +128,8 @@ export function desktopSession(directory, port, environment = {}, entry = '.', e
       }
       app = startProcess(
         executable ?? './node_modules/electron/dist/Electron.app/Contents/MacOS/Electron',
-        [...(executable ? [] : [entry]), `--remote-debugging-port=${port}`, `--user-data-dir=${directory}`],
+        [...(executable ? [] : [entry]), `--remote-debugging-port=${port}`, `--user-data-dir=${directory}`,
+          ...(legacyShell ? ['--legacy-shell'] : [])],
         {
           stdio: ['ignore', 'ignore', 'pipe'],
           env: { ...process.env, ...environment, ELECTRON_RUN_AS_NODE: '' }
