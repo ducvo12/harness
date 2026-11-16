@@ -56,8 +56,7 @@ export class RunStore {
     this.store.saver.db.transaction(() => {
       if (existing.length) {
         for (const message of existing) {
-          this.store.saveMessage(run.conversationId, { ...message, runId: run.id, delivery: 'pending' })
-          run.messageIds.push(message.id)
+          this.include(run, message)
         }
       } else {
         this.append(run, text)
@@ -72,16 +71,29 @@ export class RunStore {
       model: run.model, connectionId: run.connectionId, effort: run.effort
     }
     this.store.saver.db.transaction(() => {
-      const detail = this.store.get(run.agentId, run.conversationId)
-      if (!detail.messages.length && detail.title === 'New conversation') {
-        this.store.saver.db.prepare('UPDATE conversations SET title = ? WHERE id = ?')
-          .run(text.slice(0, 64), run.conversationId)
-      }
-      this.store.saveMessage(run.conversationId, message)
+      this.store.saveUserMessage(this.store.get(run.agentId, run.conversationId), message)
       run.messageIds.push(message.id)
       this.save(run)
     })()
     return message
+  }
+
+  adopt(run: RunSnapshot, message: AgentMessage) {
+    return this.store.saver.db.transaction(() => {
+      const accepted = this.include(run, message)
+      this.save(run)
+      return accepted
+    })()
+  }
+
+  private include(run: RunSnapshot, message: AgentMessage) {
+    const accepted: AgentMessage = {
+      model: run.model, connectionId: run.connectionId, effort: run.effort,
+      ...message, runId: run.id, delivery: 'pending'
+    }
+    this.store.saveMessage(run.conversationId, accepted)
+    run.messageIds.push(message.id)
+    return accepted
   }
 
   pending(run: RunSnapshot) {

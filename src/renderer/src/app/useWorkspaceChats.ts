@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AgentMessage, ConversationDetail } from '../../../shared/agent'
 import type { Result, SavedConnection } from '../../../shared/chat'
+import type { ConversationLocation } from '../../../shared/organization'
 import type { ApprovalRequest } from '../../../shared/harness'
 import { isLiveRun, type RunIntent, type RunSnapshot } from '../../../shared/run'
 import { ConversationStream } from './conversation-stream'
@@ -8,6 +9,13 @@ import { ConversationStream } from './conversation-stream'
 export interface ChatIdentity {
   agentId: string
   id: string
+}
+
+interface MessageSubmission {
+  messageId?: string
+  location?: ConversationLocation
+  started: (id: string) => void
+  accepted: (chat: ConversationDetail) => void
 }
 
 export interface WorkspaceChatState {
@@ -43,7 +51,7 @@ export function useWorkspaceChats() {
   const [chats, setChats] = useState(new Map<string, WorkspaceChatState>())
   const loads = useRef(new Map<string, Promise<Result<ConversationDetail>>>())
   const runRecords = useRef(new Map<string, RunSnapshot>())
-  const submissions = useRef(new Map<string, { id: string; accepted: () => void }>())
+  const submissions = useRef(new Map<string, string>())
 
   function update(key: string, change: (chat: WorkspaceChatState) => WorkspaceChatState) {
     setChats(current => new Map(current).set(key, change(current.get(key) ?? {})))
@@ -53,11 +61,9 @@ export function useWorkspaceChats() {
     update(key, chat => ({ ...chat, error }))
   }
 
-  function finishSubmission(key: string, id: string, accepted: boolean) {
-    const submission = submissions.current.get(key)
-    if (submission?.id !== id) return
+  function finishSubmission(key: string, id: string) {
+    if (submissions.current.get(key) !== id) return
     submissions.current.delete(key)
-    if (accepted) submission.accepted()
     update(key, chat => ({ ...chat, submitting: false }))
   }
 
@@ -71,7 +77,7 @@ export function useWorkspaceChats() {
       const key = runChatKey(owner)
       const publishedRun = delta.run ? currentRun(runRecords.current.values(), key) : undefined
       // The runtime publishes a new run only after accepting its input in storage.
-      if (delta.run) finishSubmission(key, delta.run.id, true)
+      if (delta.run) finishSubmission(key, delta.run.id)
       setChats(current => {
         const chat = current.get(key)
         if (!chat) return current
@@ -131,17 +137,16 @@ export function useWorkspaceChats() {
     void request.then(publish, () => publish({ ok: false, error: 'Could not load this conversation.' }))
   }
 
-  function remember(conversation: ConversationDetail) {
-    update(chatKey(conversation), chat => ({ ...chat, result: { ok: true, value: conversation } }))
-  }
-
-  function updateTitle(identity: ChatIdentity, title: string) {
-    const key = chatKey(identity)
-    setChats(current => {
-      const chat = current.get(key)
-      if (!chat?.result?.ok || chat.result.value.title === title) return current
-      return new Map(current).set(key, { ...chat, result: { ok: true, value: { ...chat.result.value, title } } })
-    })
+  function rememberAccepted(conversation: ConversationDetail, requestId: string) {
+    const accepted = conversation.messages.find(message => message.id === requestId)!
+    const key = chatKey(conversation)
+    loads.current.delete(key)
+    update(key, chat => ({
+      ...chat,
+      result: { ok: true, value: conversation },
+      messages: chat.messages && !chat.messages.some(message => message.id === requestId)
+        ? [...chat.messages, accepted] : chat.messages
+    }))
   }
 
   function prune(isOpen: (key: string) => boolean) {
@@ -180,27 +185,40 @@ export function useWorkspaceChats() {
 
   async function submit(
     identity: ChatIdentity,
-    connection: SavedConnection,
+    connection: SavedConnection | undefined,
     model: string,
     effort: string,
     text: string,
     intent: RunIntent,
-    accepted: () => void
+    message?: MessageSubmission
   ) {
     const key = chatKey(identity)
     if (submissions.current.has(key)) return
     const requestId = crypto.randomUUID()
-    submissions.current.set(key, { id: requestId, accepted })
+    const messageId = message ? message.messageId ?? crypto.randomUUID() : undefined
+    submissions.current.set(key, requestId)
     update(key, chat => ({ ...chat, submitting: true, error: '' }))
 
     try {
-      const result = await window.granite.stream(requestId, identity.agentId, identity.id, connection.id, text,
-        connection.provider === 'chatgpt' ? model : undefined, effort, intent)
-      if (result.ok) {
-        // Steering accepts a message into the existing run and returns its ID.
-        finishSubmission(key, requestId, !result.value.stopped)
+      if (message && messageId) {
+        message.started(messageId)
+        const accepted = await window.granite.conversations.acceptMessage(identity.agentId, identity.id, messageId, text, message.location)
+        if (!accepted.ok) {
+          setError(key, accepted.error)
+          return
+        }
+        rememberAccepted(accepted.value, messageId)
+        message.accepted(accepted.value)
+      }
+
+      if (!connection) {
+        setError(key, 'Connect an available model to run pending messages.')
         return
       }
+
+      const result = await window.granite.stream(requestId, identity.agentId, identity.id, connection.id, text,
+        connection.provider === 'chatgpt' ? model : undefined, effort, message ? 'accepted' : intent, messageId)
+      if (result.ok) return
       setError(key, result.error)
       await reconcileInterruptedRun(identity, requestId).catch(() => {
         // Keep the original submission error when the worker is still unavailable.
@@ -214,9 +232,9 @@ export function useWorkspaceChats() {
     } catch {
       setError(key, bridgeError)
     } finally {
-      finishSubmission(key, requestId, false)
+      finishSubmission(key, requestId)
     }
   }
 
-  return { chats, load, remember, updateTitle, prune, submit, setError }
+  return { chats, load, prune, submit, setError }
 }

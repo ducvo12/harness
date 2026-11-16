@@ -119,6 +119,9 @@ port.on('message', async ({ data }: { data: Request }) => {
         await agent.registry.get(args[0])
         value = agent.store.list(...args)
         break
+      case 'acceptMessage':
+        value = await agent.acceptMessage(...args)
+        break
       case 'create':
         value = await agent.createConversation(...args)
         break
@@ -201,7 +204,8 @@ port.on('message', async ({ data }: { data: Request }) => {
               args[3],
               args[4],
               (delta: StreamDelta) => port.postMessage({ delta }),
-              args[5]
+              args[5],
+              args[6]
             )
           } finally {
             stopped.delete(args[0])

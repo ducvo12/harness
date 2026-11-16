@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
 import type { Agent, Conversation } from '../../../../shared/agent'
-import type { Project, Section } from '../../../../shared/organization'
+import type { ConversationLocation, Project, Section } from '../../../../shared/organization'
 import { defaultTreeSort, sortTreeEntries } from '../../app/tree-sort'
 import { useSavedResource } from '../../app/useSavedResource'
-import type { DraftChatDestination } from '../../components/panes/tabs'
+import type { DraftChatDestination, NewChatLocation } from '../../components/panes/tabs'
 import TreeActionIcon from '../../components/TreeActionIcon'
 import AgentMarkdownFiles from '../workspace/AgentMarkdownFiles'
 
@@ -29,17 +29,25 @@ export function AgentPicker({ agents, onChoose, onNewAgent }: {
   )
 }
 
+interface DraftEntry {
+  id: string
+  title: string
+  location: ConversationLocation
+}
+
 interface AgentExplorerProps {
   agent: Agent
   revision: number
   onOpenFile: (path: string) => void
   onOpenChat: (chat: Conversation, path: string[]) => void
-  onNewChat: (destination: DraftChatDestination) => void
+  drafts: DraftEntry[]
+  onOpenDraft: (destination: DraftChatDestination) => void
+  onNewChat: (destination: NewChatLocation) => void
   onNewSection: () => void
   onNewProject: (section: Section) => void
 }
 
-export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat, onNewChat, onNewSection, onNewProject }: AgentExplorerProps) {
+export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat, drafts, onOpenDraft, onNewChat, onNewSection, onNewProject }: AgentExplorerProps) {
   const agentId = agent.id
   const load = useCallback(async () => {
     const [organization, conversations] = await Promise.all([
@@ -73,11 +81,28 @@ export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat,
     )
   }
 
-  function startChat(section: Section, project?: Project) {
+  function chatLocation(section: Section, project?: Project): NewChatLocation {
     const path = [agent.name, section.name]
     if (project) path.push(project.name)
-    onNewChat({ agentId, path, location: { sectionId: section.id, projectId: project?.id ?? null } })
+    return { agentId, path, location: { sectionId: section.id, projectId: project?.id ?? null } }
   }
+
+  function draftRow(draft: DraftEntry, destination: NewChatLocation) {
+    return (
+      <button key={draft.id} type="button" className="tree-entry" title={draft.title}
+        onClick={() => onOpenDraft({ ...destination, draftId: draft.id })}>
+        <span>Draft · {draft.title}</span>
+      </button>
+    )
+  }
+
+  function draftsAt(section: Section, project?: Project) {
+    return drafts.filter(draft =>
+      draft.location.sectionId === section.id && draft.location.projectId === (project?.id ?? null))
+  }
+
+  const unavailableDrafts = drafts.filter(draft => !sections.some(section => section.id === draft.location.sectionId) ||
+    (draft.location.projectId !== null && !projects.some(project => project.id === draft.location.projectId)))
 
   function newChatAction(section: Section, project?: Project) {
     const label = `New chat in ${project?.name ?? section.name}`
@@ -86,7 +111,7 @@ export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat,
         event.preventDefault()
         const folder = event.currentTarget.closest('details')
         if (folder) folder.open = true
-        startChat(section, project)
+        onNewChat(chatLocation(section, project))
       }}>
         <TreeActionIcon plus />
       </button>
@@ -97,7 +122,7 @@ export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat,
     <div className="agent-explorer">
       <div className="agent-explorer-actions">
         {general && (
-          <button type="button" className="new-chat-button quiet-button" aria-label="New chat" title="New chat in General" onClick={() => startChat(general)}>
+          <button type="button" className="new-chat-button quiet-button" aria-label="New chat" title="New chat in General" onClick={() => onNewChat(chatLocation(general))}>
             <span aria-hidden="true">+</span>New chat
           </button>
         )}
@@ -109,6 +134,10 @@ export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat,
 
       <AgentMarkdownFiles agentId={agentId} revision={revision} onOpen={onOpenFile} />
 
+      {unavailableDrafts.map(draft => draftRow(draft, {
+        agentId, location: draft.location, path: [agent.name, 'Unavailable location']
+      }))}
+
       {!sections.length && <p className="tree-empty">No saved sections.</p>}
 
       {sort(sections).map(section => {
@@ -117,6 +146,7 @@ export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat,
           ...projects.filter(project => project.sectionId === section.id)
         ])
 
+        const sectionDrafts = draftsAt(section)
         return (
           <details key={section.id} open>
             <summary>
@@ -132,11 +162,14 @@ export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat,
                 </button>
               )}
 
-              {!children.length && <p className="tree-empty">No saved chats.</p>}
+              {sectionDrafts.map(draft => draftRow(draft, chatLocation(section)))}
+
+              {!children.length && !sectionDrafts.length && <p className="tree-empty">No saved chats.</p>}
 
               {children.map(child => {
                 if ('title' in child) return chatRow(child, [agent.name, section.name])
                 const projectChats = sort(chats.filter(chat => chat.projectId === child.id))
+                const projectDrafts = draftsAt(section, child)
                 return (
                   <details key={child.id}>
                     <summary>
@@ -145,7 +178,9 @@ export default function AgentExplorer({ agent, revision, onOpenFile, onOpenChat,
                     </summary>
 
                     <div className="agent-tree-children">
-                      {!projectChats.length && <p className="tree-empty">No saved chats.</p>}
+                      {projectDrafts.map(draft => draftRow(draft, chatLocation(section, child)))}
+
+                      {!projectChats.length && !projectDrafts.length && <p className="tree-empty">No saved chats.</p>}
 
                       {projectChats.map(chat => chatRow(chat, [agent.name, section.name, child.name]))}
                     </div>

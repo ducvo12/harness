@@ -21,6 +21,7 @@ interface ChatComposerProps {
   submitting: boolean
   stopping: boolean
   identityDirty?: boolean
+  canSendWithoutModel?: boolean
   run?: RunSnapshot
   progress: string
   messageInput?: RefObject<HTMLTextAreaElement | null>
@@ -33,7 +34,7 @@ interface ChatComposerProps {
 
 export default function ChatComposer({
   agent, connections, connection, modelSelection, messages, draft, attachments,
-  busy, loaded, submitting, stopping, identityDirty, run, progress, messageInput,
+  busy, loaded, submitting, stopping, identityDirty, canSendWithoutModel, run, progress, messageInput,
   onSelectConnection, onOpenSettings, onDraftChange, onSend, onStop
 }: ChatComposerProps) {
   const contextResponse = latestContextResponse(messages, modelSelection.model)
@@ -55,9 +56,9 @@ export default function ChatComposer({
         ref={messageInput}
         aria-label="Message"
         value={draft}
-        disabled={submitting || !connection || !agent || !loaded}
+        disabled={submitting || (!connection && !canSendWithoutModel) || !agent || !loaded}
         placeholder={
-          connection
+          connection || canSendWithoutModel
             ? `Message ${agent?.name ?? 'your agent'}…`
             : 'Add a connection in Settings to begin'
         }
@@ -124,7 +125,7 @@ export default function ChatComposer({
               className="send-button"
               aria-label={busy ? 'Send update' : 'Send message'}
               title={busy ? 'Send a message to steer this run' : 'Send message'}
-              disabled={submitting || (!draft.trim() && !attachments.length) || !modelSelection.ready || !agent || !loaded}
+              disabled={submitting || (!draft.trim() && !attachments.length) || (!modelSelection.ready && !canSendWithoutModel) || !agent || !loaded}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 19V5m-6 6 6-6 6 6" />

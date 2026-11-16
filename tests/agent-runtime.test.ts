@@ -48,6 +48,32 @@ test('workspace contains file tools, rejects traversal and links, and protects i
   }
 })
 
+test('workspace first send atomically records a message before model setup and can be retried by ID', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'granite-accept-message-'))
+  const runtime = await AgentRuntime.open(directory)
+
+  try {
+    const agent = await runtime.createAgent('Writer')
+    const location = { sectionId: runtime.store.organization.ensureGeneral(agent.id).id, projectId: null }
+    await assert.rejects(runtime.acceptMessage(agent.id, 'bad-chat', 'first', 'Failed destination', {
+      ...location, sectionId: 'missing'
+    }))
+    assert.deepEqual(runtime.store.list(agent.id), [])
+
+    const saved = await runtime.acceptMessage(agent.id, 'new-chat', 'first', 'Keep this message', location)
+    assert.equal(saved.id, 'new-chat')
+    assert.deepEqual(saved.messages, [{ id: 'first', role: 'user', content: 'Keep this message', delivery: 'pending' }])
+    assert.deepEqual(runtime.store.runs.list(), [])
+    const repeated = await runtime.acceptMessage(agent.id, saved.id, 'first', 'Keep this message', location)
+    assert.deepEqual(repeated.messages, saved.messages)
+    await assert.rejects(runtime.acceptMessage(agent.id, saved.id, 'first', 'Different text'), /already in use/)
+    assert.equal(runtime.store.list(agent.id).length, 1)
+  } finally {
+    runtime.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test(
   'Granite tool loop persists files, memory, native state, Stop, and restart recovery',
   { timeout: 60_000 },

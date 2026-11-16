@@ -2,31 +2,30 @@ import '../styles/shell.css'
 import '../styles/panes.css'
 import '../styles/saved-chats.css'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { Agent, Conversation, ConversationDetail } from '../../../shared/agent'
+import type { Agent, Conversation } from '../../../shared/agent'
 import type { Result, SavedConnection } from '../../../shared/chat'
 import type { Section, SectionMode } from '../../../shared/organization'
 import Header from '../components/Header'
 import Workspace, { type LayoutUpdate } from '../components/panes/Workspace'
 import { createPane, findPane, updatePane, type Rect } from '../components/panes/layout'
 import { regionsMinimum, updateRegion, type RegionLayout } from '../components/panes/regions'
-import type { DraftChatDestination, FileDestination, Tab } from '../components/panes/tabs'
+import type { DraftChatDestination, FileDestination, NewChatLocation, Tab } from '../components/panes/tabs'
 import AgentExplorer, { AgentPicker } from '../features/organization/AgentExplorer'
 import WorkspaceCreationDialog from '../features/organization/WorkspaceCreationDialog'
 import type { ReadingPosition } from '../features/chat/SavedTranscript'
-import WorkspaceChat, { type ComposerDraft } from '../features/chat/WorkspaceChat'
+import WorkspaceChat from '../features/chat/WorkspaceChat'
 import Settings from '../features/connections/Settings'
 import FileView, { type FileDraft } from '../features/workspace/FileView'
 import { findTab, openDraftChat, openSavedChat, openWorkspaceFile, updateChatTab } from './saved-chat-layout'
+import { emptyChatDraft, useChatDrafts } from './useChatDrafts'
 import { useSavedResource } from './useSavedResource'
-import { chatKey, useWorkspaceChats, type ChatIdentity } from './useWorkspaceChats'
+import { chatKey, useWorkspaceChats } from './useWorkspaceChats'
 import { filterWorkspaceTabs, findMissingWorkspaceTabs, loadWorkspaceLayout, saveWorkspaceLayout,
   workspacePanes, type SavedWorkspaceLayout } from './workspace-layout-storage'
 
 interface WorkspaceState extends SavedWorkspaceLayout {
   focus?: { tabId: string; composer?: boolean }
 }
-
-type DraftState = ComposerDraft & { creating?: boolean; error?: string }
 
 type Creation =
   | { kind: 'agent'; pickerId?: string }
@@ -52,19 +51,22 @@ function loadConnections() {
   return window.granite.connections.list()
 }
 
-const emptyDraft: DraftState = { text: '', attachments: [] }
-
 export default function WorkspaceApp() {
-  const [restored] = useState(loadWorkspaceLayout)
+  const chatDrafts = useChatDrafts()
+  const [restored] = useState(() => {
+    const saved = loadWorkspaceLayout()
+    return { ...saved, layout: filterWorkspaceTabs(saved.layout, tab =>
+      tab.type !== 'chat' || !tab.conversation?.draftId || chatDrafts.drafts.has(tab.conversation.draftId)) }
+  })
   const [state, setState] = useState<WorkspaceState>(restored)
   const checkedRestoredTabs = useRef(false)
   const [bounds, setBounds] = useState<Rect>({ x: 0, y: 0, width: 0, height: 0 })
   const [windowError, setWindowError] = useState('')
   const workspace = useRef<HTMLElement>(null)
   const positions = useRef(new Map<string, ReadingPosition>())
-  const [drafts, setDrafts] = useState(new Map<string, DraftState>())
   const [fileDrafts, setFileDrafts] = useState(new Map<string, FileDraft>())
-  const creatingDrafts = useRef(new Set<string>())
+  const focusedChat = useRef<string | undefined>(undefined)
+  const reconciledDrafts = useRef(false)
   const [explorerRevisions, setExplorerRevisions] = useState(new Map<string, number>())
   const [creation, setCreation] = useState<Creation>()
   const [selectedConnection, setSelectedConnection] = useState(() => localStorage.getItem('granite.connection') ?? '')
@@ -79,6 +81,8 @@ export default function WorkspaceApp() {
     ? (connections.value.find(item => item.id === selectedConnection) ?? connections.value[0])?.id ?? ''
     : ''
   const { layout, nextPane, focus } = state
+  const panes = workspacePanes(layout)
+  const tabSelection = JSON.stringify(panes.map(pane => [pane.activeTabId, pane.tabs.map(tab => tab.id)]))
   const measured = bounds.width > 0 && bounds.height > 0
   const minimum = regionsMinimum(layout)
   const minWidth = Math.ceil(minimum.width + window.innerWidth - bounds.width)
@@ -108,18 +112,40 @@ export default function WorkspaceApp() {
   }, [settingsOpen])
 
   useLayoutEffect(() => {
+    chatDrafts.checkpoint()
+  }, [tabSelection])
+
+  useLayoutEffect(() => {
+    let pending = true
     const save = () => {
-      window.clearTimeout(timer)
-      window.removeEventListener('pagehide', save)
-      saveWorkspaceLayout({ layout, nextPane })
+      pending = false
+      saveWorkspaceLayout({ layout, nextPane }, chatDrafts.savedIds())
     }
     const timer = window.setTimeout(save, 120)
-    window.addEventListener('pagehide', save)
+    const saveBeforeClose = () => {
+      if (chatDrafts.checkpoint() || pending) save()
+    }
+    window.addEventListener('beforeunload', saveBeforeClose)
     return () => {
       window.clearTimeout(timer)
-      window.removeEventListener('pagehide', save)
+      window.removeEventListener('beforeunload', saveBeforeClose)
     }
   }, [layout, nextPane])
+
+  useEffect(() => window.granite.conversations.onDeleted((agentId, id) => {
+    chatDrafts.clear(id)
+    setState(current => withLayout(current, filterWorkspaceTabs(current.layout, tab =>
+      tab.type !== 'chat' || tab.conversation?.id !== id || tab.conversation.agentId !== agentId)))
+    refreshExplorer(agentId)
+  }), [])
+
+  useEffect(() => {
+    if (!agents?.ok || reconciledDrafts.current) return
+    let current = true
+    void chatDrafts.reconcile(agents.value, () => current, showSavedChat)
+      .then(() => { if (current) reconciledDrafts.current = true })
+    return () => { current = false }
+  }, [agents])
 
   useEffect(() => {
     if (!agents?.ok || checkedRestoredTabs.current) return
@@ -144,10 +170,6 @@ export default function WorkspaceApp() {
     for (const viewId of positions.current.keys()) {
       if (!findTab(content, tab => tab.id === viewId)) positions.current.delete(viewId)
     }
-    setDrafts(current => {
-      const open = [...current].filter(([viewId]) => findTab(content, tab => tab.id === viewId))
-      return open.length === current.size ? current : new Map(open)
-    })
     setFileDrafts(current => {
       const open = [...current].filter(([viewId]) => findTab(content, tab => tab.id === viewId))
       return open.length === current.size ? current : new Map(open)
@@ -157,26 +179,14 @@ export default function WorkspaceApp() {
   useEffect(() => {
     const content = layout.regions.find(region => region.type === 'content')!.layout
     chatSession.prune(key => Boolean(findTab(content, tab =>
-      tab.type === 'chat' && tab.conversation?.id !== undefined && chatKey(tab.conversation) === key
+      tab.type === 'chat' && tab.conversation !== undefined &&
+      chatKey({ agentId: tab.conversation.agentId, id: tab.conversation.id ?? tab.conversation.draftId }) === key
     )))
   }, [layout, chatSession.chats])
 
   function selectConnection(id: string) {
     setSelectedConnection(id)
     localStorage.setItem('granite.connection', id)
-  }
-
-  function clearDraft(id: string) {
-    setDrafts(current => {
-      if (!current.has(id)) return current
-      const remaining = new Map(current)
-      remaining.delete(id)
-      return remaining
-    })
-  }
-
-  function patchDraft(id: string, change: Partial<DraftState>) {
-    setDrafts(current => new Map(current).set(id, { ...(current.get(id) ?? emptyDraft), ...change }))
   }
 
   function refreshExplorer(agentId: string) {
@@ -216,56 +226,25 @@ export default function WorkspaceApp() {
     if (draft && draft.text !== draft.original) return 'Save or cancel your file edits before closing'
   }
 
-  function newChat(destination: DraftChatDestination) {
+  function openDraft(destination: DraftChatDestination) {
     setState(current => {
       const opened = openDraftChat(current.layout, nextGroup(current), destination)
       return { ...withLayout(current, opened.layout), focus: { tabId: opened.tabId, composer: true } }
     })
   }
 
-  async function saveDraft(tabId: string, destination: DraftChatDestination): Promise<ConversationDetail | undefined> {
-    if (creatingDrafts.current.has(tabId)) return
-    creatingDrafts.current.add(tabId)
-    patchDraft(tabId, { creating: true, error: '' })
-
-    let error = ''
-    try {
-      const result = await window.granite.conversations.create(destination.agentId, destination.location)
-      if (!result.ok) {
-        error = result.error
-        return
-      }
-
-      const { agentId, id, title } = result.value
-      setState(current => withLayout(current, updateChatTab(current.layout, tab => tab.id === tabId, tab => ({
-        ...tab,
-        title,
-        conversation: { agentId, id, path: destination.path }
-      }))))
-      refreshExplorer(agentId)
-      return result.value
-    } catch {
-      error = 'Could not create this chat.'
-    } finally {
-      creatingDrafts.current.delete(tabId)
-      setDrafts(current => {
-        const draft = current.get(tabId)
-        return draft ? new Map(current).set(tabId, { ...draft, creating: false, error }) : current
-      })
-    }
+  function newChat(destination: NewChatLocation) {
+    openDraft({ ...destination, draftId: crypto.randomUUID() })
   }
 
-  async function refreshNewChat(identity: ChatIdentity) {
-    refreshExplorer(identity.agentId)
-    const result = await window.granite.conversations.get(identity.agentId, identity.id).catch(() => undefined)
-    // A metadata refresh can fail while the transcript is still streaming.
-    if (!result?.ok) return
-    const { title } = result.value
-    chatSession.updateTitle(identity, title)
-    setState(current => withLayout(current, updateChatTab(current.layout,
-      tab => tab.conversation?.id === identity.id && tab.conversation.agentId === identity.agentId && tab.title !== title,
-      tab => ({ ...tab, title })
-    )))
+  function showSavedChat(saved: Conversation) {
+    setState(current => withLayout(current, updateChatTab(current.layout, tab =>
+      (tab.conversation?.id ?? tab.conversation?.draftId) === saved.id,
+    tab => ({
+      ...tab, title: saved.title,
+      conversation: { agentId: saved.agentId, id: saved.id, path: tab.conversation!.path }
+    }))))
+    refreshExplorer(saved.agentId)
   }
 
   function chooseAgent(agent: Agent, pickerId?: string) {
@@ -318,8 +297,14 @@ export default function WorkspaceApp() {
     )
     const agent = agents.value.find(item => item.id === agentId)
     if (agent) {
+      const drafts = [...chatDrafts.drafts.values()].flatMap(draft =>
+        draft.agentId === agent.id && draft.location ? [{
+          id: draft.id, location: draft.location,
+          title: draft.text.trim().split('\n', 1)[0].slice(0, 64) || draft.attachments[0]?.name || 'New chat'
+        }] : []
+      )
       return <AgentExplorer key={pickerId} agent={agent} revision={explorerRevisions.get(agent.id) ?? 0}
-        onOpenFile={path => openFile({ agentId: agent.id, path })} onOpenChat={openChat} onNewChat={newChat}
+        drafts={drafts} onOpenDraft={openDraft} onOpenFile={path => openFile({ agentId: agent.id, path })} onOpenChat={openChat} onNewChat={newChat}
         onNewSection={() => setCreation({ kind: 'section', agentId: agent.id })}
         onNewProject={section => setCreation({ kind: 'project', section })} />
     }
@@ -340,10 +325,11 @@ export default function WorkspaceApp() {
     }
     if (tab.type === 'chat' && tab.conversation) {
       const conversation = tab.conversation
-      const key = conversation.id !== undefined ? chatKey(conversation) : undefined
-      const draft = drafts.get(tab.id) ?? emptyDraft
-      const chat = key ? chatSession.chats.get(key) : { submitting: draft.creating, error: draft.error }
-      const hasMessages = chat?.messages?.length ?? (chat?.result?.ok ? chat.result.value.messages.length : 0)
+      const id = conversation.id ?? conversation.draftId
+      const identity = { agentId: conversation.agentId, id }
+      const key = chatKey(identity)
+      const draft = chatDrafts.drafts.get(id) ?? emptyChatDraft
+      const chat = chatSession.chats.get(key)
       const agent = agents?.ok ? agents.value.find(item => item.id === conversation.agentId) : undefined
       return (
         <WorkspaceChat
@@ -355,27 +341,26 @@ export default function WorkspaceApp() {
           connections={connections}
           selectedConnection={defaultConnection}
           draft={draft}
-          onDraftChange={change => patchDraft(tab.id, change)}
-          onDraftAccepted={() => clearDraft(tab.id)}
+          draftId={id}
+          onDraftChange={change => chatDrafts.patch(conversation, change)}
           onSelectConnection={selectConnection}
           onOpenSettings={() => setSettingsOpen(true)}
           onRetryConnections={retryConnections}
-          onSubmit={async (connection, model, effort, text, intent, accepted) => {
-            let saved: ChatIdentity
-            if (conversation.id !== undefined) {
-              saved = conversation
-            } else {
-              const created = await saveDraft(tab.id, conversation)
-              if (!created) return
-              chatSession.remember(created)
-              saved = created
-            }
-            await chatSession.submit(saved, connection, model, effort, text, intent, () => {
-              accepted()
-              if (intent === 'message' && !hasMessages) void refreshNewChat(saved)
-            })
-          }}
-          onError={error => key ? chatSession.setError(key, error) : patchDraft(tab.id, { error })}
+          onSubmit={(connection, model, effort, text, intent) => chatSession.submit(
+            identity, connection, model, effort, text, intent, intent === 'message' ? {
+              messageId: chatDrafts.get(id)?.pendingId,
+              location: conversation.location,
+              started: pendingId => {
+                chatDrafts.patch(conversation, { pendingId })
+                chatDrafts.checkpoint()
+              },
+              accepted: saved => {
+                chatDrafts.clear(id)
+                showSavedChat(saved)
+              }
+            } : undefined
+          )}
+          onError={error => chatSession.setError(key, error)}
           onReload={() => {
             if (conversation.id !== undefined) chatSession.load(conversation, true)
           }}
@@ -388,10 +373,19 @@ export default function WorkspaceApp() {
   }
 
   return (
-    <div className="app workspace-app">
+    <div className="app workspace-app" onFocusCapture={event => {
+      const element = event.target.closest<HTMLElement>('[data-chat-draft-id]')
+      const id = element?.dataset.chatDraftId
+      if (id && id !== focusedChat.current) {
+        if (chatDrafts.checkpoint()) saveWorkspaceLayout({ layout, nextPane }, chatDrafts.savedIds())
+        focusedChat.current = id
+      }
+    }}>
       <Header />
 
       {windowError && <p role="alert">{windowError}</p>}
+
+      {chatDrafts.error && <p role="alert">{chatDrafts.error}</p>}
 
       <Workspace
         layout={layout}

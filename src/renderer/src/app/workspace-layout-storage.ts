@@ -25,7 +25,14 @@ const tab = z.discriminatedUnion('type', [
   z.object({
     ...tabFields,
     type: z.literal('chat'),
-    conversation: z.object({ agentId, id: z.string().check(z.minLength(1), z.maxLength(100)), path: z.array(z.string()) })
+    conversation: z.union([
+      z.object({ agentId, id: z.string().check(z.minLength(1), z.maxLength(100)), path: z.array(z.string()) }),
+      z.object({
+        agentId, draftId: z.uuid(), path: z.array(z.string()), location: z.object({
+          sectionId: z.string(), projectId: z.nullable(z.string())
+        })
+      })
+    ])
   }),
   z.object({
     ...tabFields,
@@ -138,9 +145,10 @@ export function loadWorkspaceLayout(): SavedWorkspaceLayout {
   return { layout: updateRegion(initialRegions, 'content', null), nextPane: 2 }
 }
 
-export function saveWorkspaceLayout({ layout, nextPane }: SavedWorkspaceLayout) {
+export function saveWorkspaceLayout({ layout, nextPane }: SavedWorkspaceLayout, draftIds: ReadonlySet<string>) {
   const saved = filterWorkspaceTabs(layout, tab =>
-    tab.type === 'agent' || (tab.type === 'chat' && tab.conversation?.id !== undefined) ||
+    tab.type === 'agent' || (tab.type === 'chat' && (tab.conversation?.id !== undefined ||
+      (tab.conversation?.draftId !== undefined && draftIds.has(tab.conversation.draftId)))) ||
     (tab.type === 'file' && tab.file !== undefined && isWorkspaceMarkdown(tab.file.path))
   )
   try {

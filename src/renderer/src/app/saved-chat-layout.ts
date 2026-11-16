@@ -41,7 +41,9 @@ function openContentTab(
 }
 
 export function openDraftChat(layout: RegionLayout, identity: Pick<PaneNode, 'id' | 'title'>, destination: DraftChatDestination) {
-  return addContentTab(layout, identity, { type: 'chat', title: 'New chat', conversation: destination })
+  return openContentTab(layout, identity, { type: 'chat', title: 'New chat', conversation: destination },
+    tab => tab.type === 'chat' && tab.conversation?.draftId === destination.draftId
+  )
 }
 
 function addContentTab(layout: RegionLayout, identity: Pick<PaneNode, 'id' | 'title'>, tab: NewTab) {

@@ -25,11 +25,11 @@ interface WorkspaceChatProps {
   selectedConnection: string
   draft: ComposerDraft
   onDraftChange: (draft: Partial<ComposerDraft>) => void
-  onDraftAccepted: () => void
+  draftId: string
   onSelectConnection: (id: string) => void
   onOpenSettings: () => void
   onRetryConnections: () => void
-  onSubmit: (connection: SavedConnection, model: string, effort: string, text: string, intent: RunIntent, accepted: () => void) => Promise<void>
+  onSubmit: (connection: SavedConnection | undefined, model: string, effort: string, text: string, intent: RunIntent) => Promise<void>
   onError: (error: string) => void
   onReload: () => void
   readPosition: () => ReadingPosition | undefined
@@ -40,7 +40,7 @@ const noMessages: AgentMessage[] = []
 const noConnections: SavedConnection[] = []
 
 export default function WorkspaceChat({
-  chat, agent, conversationId, path, connections, selectedConnection, draft, onDraftChange, onDraftAccepted,
+  chat, agent, conversationId, path, connections, selectedConnection, draft, onDraftChange, draftId,
   onSelectConnection, onOpenSettings, onRetryConnections, onSubmit, onError, onReload, readPosition, savePosition
 }: WorkspaceChatProps) {
   const result = chat?.result
@@ -51,11 +51,13 @@ export default function WorkspaceChat({
   const savedConnections = connections?.ok ? connections.value : noConnections
   const { connection, model, effort } = chatModelBinding(savedConnections, selectedConnection, messages, run)
   const modelSelection = useConnectionModel(connection, model, conversationId, effort)
-  const loaded = (!conversationId || result?.ok === true) && connections?.ok === true
+  const loaded = !conversationId || result?.ok === true
   const transcript = result?.ok ? { ok: true as const, value: { ...result.value, messages } } : result
 
   async function send(intent: RunIntent) {
-    if (!connection || !modelSelection.ready || !agent || !loaded || submitting) return
+    if (!agent || !loaded || submitting) return
+    const available = modelSelection.ready ? connection : undefined
+    if (intent !== 'message' && !available) return
     if (intent === 'message' && !draft.text.trim() && !draft.attachments.length) return
 
     let text: string
@@ -65,8 +67,7 @@ export default function WorkspaceChat({
       onError(error instanceof Error ? error.message : 'Could not prepare attachments.')
       return
     }
-    await onSubmit(connection, modelSelection.model, modelSelection.effort, text, intent,
-      intent === 'message' ? onDraftAccepted : () => {})
+    await onSubmit(available, modelSelection.model, modelSelection.effort, text, intent)
   }
 
   async function request(action: () => Promise<Result<void>>): Promise<boolean> {
@@ -92,7 +93,7 @@ export default function WorkspaceChat({
   const approval = chat?.approval
   const question = run?.question
   return (
-    <div className="workspace-chat">
+    <div className="workspace-chat" data-chat-draft-id={draftId}>
       <SavedTranscript draft={!conversationId} result={transcript} path={path} retry={onReload} readPosition={readPosition} savePosition={savePosition} />
 
       <div className="composer-area">
@@ -127,7 +128,7 @@ export default function WorkspaceChat({
 
         {loaded && model && !connection && (
           <div className="error" role="alert">
-            Restore this chat’s saved connection to send a message.
+            Restore this chat’s saved connection to get a reply.
 
             {savedConnections.length > 0 && (
               <button type="button" onClick={onOpenSettings}>
@@ -154,7 +155,7 @@ export default function WorkspaceChat({
 
         <ChatComposer agent={agent} connections={savedConnections} connection={connection} modelSelection={modelSelection}
           messages={messages} draft={draft.text} attachments={draft.attachments} busy={busy} loaded={loaded} submitting={submitting}
-          stopping={run?.phase === 'stopping'} run={run} progress={run ? runLabel(run) : ''}
+          canSendWithoutModel stopping={run?.phase === 'stopping'} run={run} progress={run ? runLabel(run) : ''}
           onSelectConnection={onSelectConnection} onOpenSettings={onOpenSettings}
           onDraftChange={text => onDraftChange({ text })} onSend={() => send('message')} onStop={stop} />
       </div>

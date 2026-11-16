@@ -38,7 +38,7 @@ export interface RecoveryNotice {
   previews?: number
 }
 
-export type RunIntent = 'message' | 'continue' | 'pending'
+export type RunIntent = 'message' | 'continue' | 'pending' | 'accepted'
 
 export function isLiveRun(run: RunSnapshot) {
   return !['complete', 'stopped', 'error', 'interrupted', 'not_started'].includes(run.phase)

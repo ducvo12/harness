@@ -27,8 +27,13 @@ const provider = createServer(async (request, response) => {
   for await (const chunk of request) raw += chunk
   const prompt = JSON.parse(raw).messages.findLast(message => message.role === 'user').content
   prompts.push(prompt)
+  if (prompt === 'Provider refuses this message') {
+    response.writeHead(400, { 'Content-Type': 'application/json' })
+    response.end('{"error":{"message":"Fixture rejected the request"}}')
+    return
+  }
   response.writeHead(200, { 'Content-Type': 'text/event-stream' })
-  if (prompt === 'Keep working in this chat') {
+  if (prompt === 'Keep working in this chat' || prompt === 'Hold for steering') {
     held = response
     streamEvent(response, { content: 'Partial saved-chat reply' })
     return
@@ -142,10 +147,103 @@ async function verifyCreation(entry) {
     await click('Nova')
     await wait(() => evaluate('Boolean(document.querySelector("[aria-label=\'New chat in Roadmap\']"))'), 'project survives relaunch')
     await verifyMarkdown(fresh, root)
+    await verifyDrafts(fresh, nova.id)
   } finally {
     await fresh.quit()
   }
   console.log('Fresh-profile creation for agents, sections, and chat-only projects passed, including validation and relaunch.')
+}
+
+async function verifyDrafts(fresh, agentId) {
+  const { click, evaluate, fill, wait } = fresh
+  const input = 'textarea[aria-label="Message"]'
+  const draft = () => evaluate(`document.querySelector(${JSON.stringify(input)})?.value`)
+  const conversations = async () => {
+    const result = await evaluate(`window.granite.conversations.list(${JSON.stringify(agentId)})`)
+    assert.ok(result.ok, result.error)
+    return result.value
+  }
+  const savedChatRow = `document.querySelector('.tree-entry[title^="Outline saved on quit"]')`
+  const openSaved = () => evaluate(`${savedChatRow}.click()`)
+  const snapshot = () => evaluate("JSON.parse(localStorage.getItem('granite.workspace.chat-drafts'))?.drafts ?? []")
+  const closeChatTab = () => evaluate(`document.querySelector('[data-region=content] [role=tab][aria-selected=true]').nextElementSibling.click()`)
+
+  await evaluate(`[...document.querySelectorAll('summary')].find(summary => summary.textContent.trim() === 'Roadmap').click()`)
+  await click('New chat in Roadmap')
+  await fill(input, 'Outline', 'textarea')
+  await evaluate(`(() => {
+    const input = document.querySelector('input[type=file]')
+    const transfer = new DataTransfer()
+    transfer.items.add(new File(['Roadmap notes'], 'notes.txt', { type: 'text/plain' }))
+    input.files = transfer.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await wait(() => evaluate(`Boolean(document.querySelector('[aria-label="Remove notes.txt"]'))`), 'draft attachment loaded')
+  assert.equal((await snapshot()).length, 0)
+  await closeChatTab()
+  await wait(async () => (await snapshot()).some(draft => draft.text === 'Outline'), 'closing the tab saves the draft')
+  assert.deepEqual(await conversations(), [])
+  await click('Draft · Outline')
+  assert.equal(await draft(), 'Outline')
+
+  await fill(input, 'Outline saved on quit', 'textarea')
+  assert.equal((await snapshot())[0].text, 'Outline')
+  await fresh.quit()
+  await fresh.launch()
+  await wait(async () => await draft() === 'Outline saved on quit', 'normal quit saves the last edit and restores its open tab')
+  assert.equal(await evaluate(`document.querySelector('.saved-transcript-header p').textContent`), 'Nova / Research / Roadmap')
+  assert.equal((await snapshot())[0].attachments[0].content, 'Roadmap notes')
+
+  await wait(() => evaluate(`document.querySelector('[aria-label="Send message"]')?.disabled === false`),
+    'restored composer is ready without a provider')
+  await click('Send message')
+  await wait(() => evaluate('document.querySelector(".saved-transcript")?.textContent.includes("Outline saved on quit")'), 'outgoing message appears without a provider')
+  await wait(() => evaluate('document.querySelector(".workspace-chat .error")?.textContent.includes("Connect an available model")'), 'missing provider is reported after acceptance')
+  assert.equal(await draft(), '')
+  const [chat] = await conversations()
+  const saved = await evaluate(`window.granite.conversations.get(${JSON.stringify(agentId)}, ${JSON.stringify(chat.id)})`)
+  assert.equal(saved.value.messages.length, 1)
+  assert.match(saved.value.messages[0].content, /Roadmap notes/)
+  assert.equal(saved.value.messages[0].delivery, 'pending')
+
+  await fill(input, 'Another draft', 'textarea')
+  await closeChatTab()
+  await wait(async () => (await snapshot()).some(draft => draft.id === chat.id), 'saved chat draft remains after closing')
+  await fresh.quit()
+  await fresh.launch()
+  await wait(() => evaluate(`Boolean(${savedChatRow})`), 'closed saved chat is listed after restart')
+  await openSaved()
+  assert.equal(await draft(), 'Another draft')
+  await fill(input, '', 'textarea')
+  await closeChatTab()
+  await wait(async () => (await snapshot()).length === 0, 'clearing the composer removes its stored draft')
+  await openSaved()
+  await fill(input, 'Delete this with the chat', 'textarea')
+  await closeChatTab()
+  await wait(async () => (await snapshot()).some(draft => draft.id === chat.id), 'draft stored before deleting the chat')
+
+  const deleted = await evaluate(`window.granite.conversations.delete(${JSON.stringify(agentId)}, ${JSON.stringify(chat.id)})`)
+  assert.ok(deleted.ok, deleted.error)
+  await wait(async () => (await snapshot()).length === 0, 'deleting the chat removes its draft')
+  // Simulate a quit after the SQLite commit and before the renderer acknowledges it.
+  const interrupted = {
+    id: crypto.randomUUID(), agentId, text: 'Accepted before quit', attachments: [], pendingId: crypto.randomUUID(),
+    location: { sectionId: chat.sectionId, projectId: chat.projectId }
+  }
+  const accepted = await evaluate(`window.granite.conversations.acceptMessage(${JSON.stringify(agentId)},
+    ${JSON.stringify(interrupted.id)}, ${JSON.stringify(interrupted.pendingId)}, ${JSON.stringify(interrupted.text)},
+    ${JSON.stringify(interrupted.location)})`)
+  assert.ok(accepted.ok, accepted.error)
+  await evaluate(`localStorage.setItem('granite.workspace.chat-drafts',
+    ${JSON.stringify(JSON.stringify({ version: 1, drafts: [interrupted] }))})`)
+  await fresh.quit()
+  await fresh.launch()
+  await wait(async () => (await snapshot()).length === 0, 'acceptance recovery removes the already-sent draft')
+  const [recovered] = await conversations()
+  assert.equal(recovered.id, interrupted.id)
+  assert.equal(recovered.title, interrupted.text)
+
+  console.log('Chat drafts survive tab closure and normal quit with attachments. Sends without a provider persist, and clearing or deletion removes drafts.')
 }
 
 async function verifyMarkdown({ evaluate, click, fill, wait }, root) {
@@ -260,6 +358,7 @@ try {
   const entry = join(directory, 'workspace.cjs')
   await writeFile(entry, `
     const { app } = require('electron')
+    process.on('SIGTERM', () => app.quit())
     app.commandLine.appendSwitch('workspace')
     app.on('browser-window-created', (_event, window) => window.webContents.setBackgroundThrottling(false))
     require(${JSON.stringify(resolve('out/main/index.js'))})
@@ -398,7 +497,7 @@ try {
       const reader = document.querySelector('.saved-transcript')
       return reader.scrollHeight - reader.clientHeight - reader.scrollTop <= 1
     })()`))
-    assert.equal(await draft(), '')
+    assert.equal(await draft(), 'Draft for the long chat')
     assert.equal(prompts.length, 0, 'opening and docking chats does not prompt the model')
 
     await fill(composer, 'Keep working in this chat', 'textarea')
@@ -619,6 +718,31 @@ try {
     await wait(() => evaluate('Boolean(document.querySelector(".agent-picker-create"))'), 'invalid snapshot restores the default explorer')
     assert.equal(await tabCount(), 0)
     assert.equal(await evaluate('document.querySelector("[data-region]").dataset.region'), 'explorer')
+    await click('Archive')
+    await wait(() => evaluate('Boolean(document.querySelector(".agent-explorer .new-chat-button"))'), 'Archive is ready after resetting layout')
+    await click('New chat')
+    await fill(composer, 'Provider refuses this message', 'textarea')
+    await click('Send message')
+    await wait(() => transcriptContains('Provider refuses this message'), 'outgoing message appears after provider rejection')
+    await wait(() => evaluate('Boolean(document.querySelector(".workspace-chat [role=alert]"))'), 'provider rejection is reported')
+    const rejected = (await savedChats()).find(chat => chat.title === 'Provider refuses this message')
+    assert.ok(rejected)
+    const rejectedChat = await evaluate(`window.granite.conversations.get(${JSON.stringify(agentId)}, ${JSON.stringify(rejected.id)})`)
+    assert.equal(rejectedChat.value.messages.filter(message => message.role === 'user').length, 1)
+    assert.equal(await draft(), '')
+    await click('New chat')
+    await fill(composer, 'Hold for steering', 'textarea')
+    await click('Send message')
+    await wait(() => transcriptContains('Partial saved-chat reply'), 'run is streaming before steering')
+    const beforeSteering = (await activeRuns()).find(run => run.phase === 'streaming')
+    await fill(composer, 'Steer the active reply', 'textarea')
+    await click('Send update')
+    await wait(() => transcriptContains('Thanks for naming the project.'), 'steering resumes the live run')
+    const steered = await evaluate(`window.granite.conversations.get(${JSON.stringify(agentId)},
+      ${JSON.stringify(beforeSteering.conversationId)})`)
+    const messages = steered.value.messages.filter(message => message.role === 'user')
+    assert.deepEqual(messages.map(message => message.content), ['Hold for steering', 'Steer the active reply'])
+    assert.ok(messages.every(message => message.runId === beforeSteering.id))
     console.log('Workspace order, widths, splits, and saved tabs survived restart. Deleted tabs and malformed snapshots recovered.')
   } finally {
     await desktop.quit()

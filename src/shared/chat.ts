@@ -122,10 +122,12 @@ export interface GraniteBridge {
     saveResponseDuration: (agentId: string, id: string, messageId: string, durationMs: number) => Promise<Result<void>>
     list: (agentId: string) => Promise<Result<Conversation[]>>
     create: (agentId: string, location?: Partial<ConversationLocation>, retention?: ChatRetention) => Promise<Result<ConversationDetail>>
+    acceptMessage: (agentId: string, id: string, messageId: string, text: string, location?: ConversationLocation) => Promise<Result<ConversationDetail>>
     keep: (agentId: string, id: string) => Promise<Result<ConversationDetail>>
     move: (agentId: string, id: string, location: ConversationLocation) => Promise<Result<ConversationDetail>>
     rename: (agentId: string, id: string, title: string) => Promise<Result<void>>
     delete: (agentId: string, id: string) => Promise<Result<void>>
+    onDeleted: (callback: (agentId: string, id: string) => void) => () => void
     get: (agentId: string, id: string) => Promise<Result<ConversationDetail>>
   }
   organization: {
@@ -182,7 +184,8 @@ export interface GraniteBridge {
     text: string,
     model?: string,
     effort?: string,
-    intent?: RunIntent
+    intent?: RunIntent,
+    messageId?: string
   ) => Promise<Result<{ stopped: boolean; steered?: boolean; runId?: string }>>
   stop: (requestId: string) => Promise<void>
   onDelta: (callback: (delta: StreamDelta) => void) => () => void

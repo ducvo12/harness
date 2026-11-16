@@ -88,17 +88,21 @@ provider and verifies that browsing saved chats does not prompt the model.
 
 **New chat** in Explorer opens a draft in the selected agent's General
 section. Section and project controls open drafts at their own locations.
-The first send saves the chat in that location and keeps the same tab.
-Closing a draft before sending leaves no saved chat.
+The first send saves the chat and its outgoing message together, before the
+provider is contacted. A connection or model failure leaves the message in
+the transcript. Closing an unsent tab leaves a draft in Explorer without
+creating a conversation.
 
 Explorer can create agents from the agent picker, Shared or Closed sections
 for the selected agent, and chat-only projects within custom sections. A new
 agent opens in the Explorer tab that created it.
 
 The workspace restores region order and widths, pane splits, and open saved
-views on launch. Unsaved chat and Markdown drafts are session-only. The
-desktop check verifies restoration and recovery from deleted tabs and an
-invalid snapshot.
+views on launch. Chat drafts save when switching or closing tabs and on
+normal quit. Reopening a chat restores its draft and text attachments.
+Deleting a chat removes its draft. A crash can lose edits since the last
+save. Markdown drafts are session-only. The desktop check covers restoration,
+draft recovery, and saving the outgoing message when the provider is unavailable.
 
 Run `node scripts/verify-saved-chats-desktop.mjs` after a build.
 
