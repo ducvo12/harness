@@ -4,6 +4,7 @@ import { initialHistory, rebuildHistory } from '../src/backend/harness/history.t
 import { chatCompletionsAdapter } from '../src/backend/harness/providers/chat-completions.ts'
 import { responsesAdapter } from '../src/backend/harness/providers/responses.ts'
 import type { NativeItem } from '../src/backend/harness/types.ts'
+import { describeNativeImages } from '../src/backend/context/budget.ts'
 
 for (const [protocol, factory] of [['chat-completions', chatCompletionsAdapter], ['responses', responsesAdapter]] as const) {
   test(`${protocol} history retains native action/result pairs, evicts retrieved tails and clones saved state`, () => {
@@ -27,5 +28,20 @@ for (const [protocol, factory] of [['chat-completions', chatCompletionsAdapter],
     ], undefined, model)
     assert.equal(history.length, 1)
     assert.match(JSON.stringify(history), /Interrupted reply; not a completed answer/)
+  })
+
+  test(`${protocol} restores image-only messages as native image content`, () => {
+    const model = factory({ connection: { baseUrl: '', model: 'test', apiKey: '' }, signal: new AbortController().signal, onText() {}, onReasoning() {} })
+    const dataUrl = 'data:image/png;base64,AA=='
+    const history = [{ id: 'image', role: 'user' as const, content: '', images: [{ name: 'image.png', dataUrl }] }]
+    const expected = protocol === 'responses'
+      ? [{ role: 'user', content: [{ type: 'input_image', image_url: dataUrl, detail: 'auto' }] }]
+      : [{ role: 'user', content: [{ type: 'image_url', image_url: { url: dataUrl } }] }]
+
+    assert.deepEqual(initialHistory(history, undefined, model), expected)
+    assert.deepEqual(rebuildHistory(history, [], model), expected)
+    const described = describeNativeImages(expected)
+    assert.equal(described.imageCount, 1)
+    assert.doesNotMatch(JSON.stringify(described.items), /base64/)
   })
 }

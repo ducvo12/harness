@@ -10,21 +10,51 @@ const directory = await mkdtemp(join(tmpdir(), 'granite-saved-chats-'))
 const existingProfile = join(directory, 'existing-profile')
 const executable = './node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'
 const prompts = []
+const sampleImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X2ioAAAAASUVORK5CYII='
 let held
+
+function pasteImage(selector) {
+  return `(() => {
+    const bytes = Uint8Array.from(atob(${JSON.stringify(sampleImage.split(',')[1])}), char => char.charCodeAt(0))
+    const clipboardData = new DataTransfer()
+    clipboardData.items.add(new File([bytes], 'clipboard.png', { type: 'image/png' }))
+    document.querySelector(${JSON.stringify(selector)})
+      .dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }))
+  })()`
+}
 function streamEvent(response, delta, finishReason = null) {
   response.write(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: finishReason }] })}\n\n`)
+}
+
+function streamTool(response, name, args, id) {
+  streamEvent(response, { tool_calls: [{
+    index: 0, id, type: 'function',
+    function: { name, arguments: JSON.stringify(args) }
+  }] })
+  streamEvent(response, {}, 'tool_calls')
 }
 
 const provider = createServer(async (request, response) => {
   if (request.url === '/v1/models') {
     response.writeHead(200, { 'Content-Type': 'application/json' })
-    response.end('{"data":[{"id":"saved-chat-test"}]}')
+    response.end('{"data":[{"id":"saved-chat-test","context_window":65536}]}')
     return
   }
 
   let raw = ''
   for await (const chunk of request) raw += chunk
-  const prompt = JSON.parse(raw).messages.findLast(message => message.role === 'user').content
+  const messages = JSON.parse(raw).messages
+  const userIndex = messages.findLastIndex(message => message.role === 'user')
+  const prompt = messages[userIndex].content
+  if (Array.isArray(prompt)) {
+    response.writeHead(200, { 'Content-Type': 'text/event-stream' })
+    const image = prompt.find(part => part.type === 'image_url')
+    streamEvent(response, { content: image?.image_url?.url === sampleImage ? 'Received the attached image.' : 'Image data missing.' })
+    streamEvent(response, {}, 'stop')
+    response.end('data: [DONE]\n\n')
+    return
+  }
+
   prompts.push(prompt)
   if (prompt === 'Provider refuses this message') {
     response.writeHead(400, { 'Content-Type': 'application/json' })
@@ -43,11 +73,27 @@ const provider = createServer(async (request, response) => {
     return
   }
   if (prompt === 'Ask me a question') {
-    streamEvent(response, { tool_calls: [{
-      index: 0, id: 'workspace-question', type: 'function',
-      function: { name: 'ask_user', arguments: JSON.stringify({ questions: [{ title: 'What should the project be called?' }] }) }
-    }] })
-    streamEvent(response, {}, 'tool_calls')
+    streamTool(response, 'ask_user', { questions: [{ title: 'What should the project be called?' }] }, 'workspace-question')
+  } else if (prompt === 'Write the baseline file' || prompt === 'Write a file and run a terminal') {
+    const baseline = prompt === 'Write the baseline file'
+    const outputs = messages.slice(userIndex + 1).filter(message => message.role === 'tool')
+    if (!outputs.length) {
+      streamTool(response, 'repo_write', {
+        path: baseline ? 'baseline.txt' : 'live.txt',
+        content: baseline ? 'baseline\n' : 'first\nsecond\n',
+        revision: null
+      }, 'workspace-write')
+    } else if (baseline) {
+      streamEvent(response, { content: 'Baseline file written.' })
+      streamEvent(response, {}, 'stop')
+    } else if (outputs.length === 1) {
+      streamTool(response, 'repo_command_start', {
+        command: 'printf "Waiting for input\\n"; read answer'
+      }, 'workspace-terminal')
+    } else {
+      // Leave the terminal active until the workspace stops the run.
+      return
+    }
   } else {
     streamEvent(response, { content: prompt === 'Start a project chat' ? 'Reply in the new project chat' : 'Thanks for naming the project.' })
     streamEvent(response, {}, 'stop')
@@ -168,14 +214,60 @@ async function verifyDrafts(fresh, agentId) {
   await evaluate(`[...document.querySelectorAll('summary')].find(summary => summary.textContent.trim() === 'Roadmap').click()`)
   await click('New chat in Roadmap')
   await fill(input, 'Outline', 'textarea')
-  await evaluate(`(() => {
-    const input = document.querySelector('input[type=file]')
+  assert.equal(await evaluate(`(() => {
+    const input = document.querySelector('.composer input[type=file]')
+    const attach = document.querySelector('.composer button[aria-label="Attach files"]')
+    let opened = false
+    input.addEventListener('click', event => {
+      event.preventDefault()
+      opened = true
+    }, { once: true })
+    attach.click()
     const transfer = new DataTransfer()
     transfer.items.add(new File(['Roadmap notes'], 'notes.txt', { type: 'text/plain' }))
     input.files = transfer.files
     input.dispatchEvent(new Event('change', { bubbles: true }))
+    return opened
+  })()`), true, 'the composer plus opens the file picker')
+  const removeAttachment = '.composer-attachments [aria-label="Remove notes.txt"]'
+  await wait(() => evaluate(`Boolean(document.querySelector(${JSON.stringify(removeAttachment)}))`), 'draft attachment appears above the input')
+  assert.ok(await evaluate(`document.querySelector(${JSON.stringify(removeAttachment)}).getBoundingClientRect().bottom <=
+    document.querySelector(${JSON.stringify(input)}).getBoundingClientRect().top`))
+  const pickerFormats = await evaluate('document.querySelector(".composer input[type=file]").accept.split(",")')
+  assert.ok(pickerFormats.includes('image/png') && pickerFormats.includes('text/*'))
+  assert.ok(pickerFormats.includes('.pdf') && pickerFormats.includes('.heic'))
+  assert.ok(!pickerFormats.includes('.zip') && !pickerFormats.includes('.dmg'))
+  await evaluate(`(() => {
+    const input = document.querySelector('.composer input[type=file]')
+    const transfer = new DataTransfer()
+    transfer.items.add(new File(['renamed binary'], 'renamed.png', { type: 'image/png' }))
+    input.files = transfer.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
   })()`)
-  await wait(() => evaluate(`Boolean(document.querySelector('[aria-label="Remove notes.txt"]'))`), 'draft attachment loaded')
+  await wait(() => evaluate('document.querySelector(".composer [role=alert]")?.textContent.includes("could not read this image")'), 'a renamed file is rejected as invalid image content')
+  assert.equal(await evaluate('document.querySelectorAll(".composer-attachment").length'), 1)
+  await evaluate(pasteImage(input))
+  await wait(() => evaluate('document.querySelector(".composer-attachments img")?.naturalWidth === 1'), 'pasted image renders as a draft thumbnail')
+  const convertFixtures = await Promise.all(['report.pdf', 'photo.heic'].map(async name => ({
+    name, data: (await readFile(new URL(`../tests/fixtures/attachments/${name}`, import.meta.url))).toString('base64')
+  })))
+  await evaluate(`(() => {
+    const input = document.querySelector('.composer input[type=file]')
+    const transfer = new DataTransfer()
+    for (const { name, data } of ${JSON.stringify(convertFixtures)}) {
+      const bytes = Uint8Array.from(atob(data), char => char.charCodeAt(0))
+      transfer.items.add(new File([bytes], name))
+    }
+    input.files = transfer.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await wait(async () => {
+    const error = await evaluate('document.querySelector(".composer [role=alert]")?.textContent')
+    assert.ok(!error, error)
+    return evaluate(`Boolean(document.querySelector('.composer-attachment[title="report.pdf"]')) &&
+      document.querySelector('.composer-attachment[title="photo.heic"] img')?.naturalWidth === 64
+    `)
+  }, 'PDF and HEIC attach, and the HEIC preview renders')
   assert.equal((await snapshot()).length, 0)
   await closeChatTab()
   await wait(async () => (await snapshot()).some(draft => draft.text === 'Outline'), 'closing the tab saves the draft')
@@ -190,17 +282,26 @@ async function verifyDrafts(fresh, agentId) {
   await wait(async () => await draft() === 'Outline saved on quit', 'normal quit saves the last edit and restores its open tab')
   assert.equal(await evaluate(`document.querySelector('.saved-transcript-header p').textContent`), 'Nova / Research / Roadmap')
   assert.equal((await snapshot())[0].attachments[0].content, 'Roadmap notes')
+  await wait(() => evaluate('document.querySelector(".composer-attachments img")?.naturalWidth === 1'), 'pasted image thumbnail survives restart')
 
   await wait(() => evaluate(`document.querySelector('[aria-label="Send message"]')?.disabled === false`),
     'restored composer is ready without a provider')
   await click('Send message')
   await wait(() => evaluate('document.querySelector(".saved-transcript")?.textContent.includes("Outline saved on quit")'), 'outgoing message appears without a provider')
   await wait(() => evaluate('document.querySelector(".workspace-chat .error")?.textContent.includes("Connect an available model")'), 'missing provider is reported after acceptance')
+  await wait(() => evaluate(`[...document.querySelectorAll('.workspace-chat-activity details')].some(item =>
+    item.querySelector('summary').textContent.includes('notes.txt') && item.textContent.includes('Roadmap notes')
+  )`), 'sent attachment appears in the same activity box')
   assert.equal(await draft(), '')
   const [chat] = await conversations()
   const saved = await evaluate(`window.granite.conversations.get(${JSON.stringify(agentId)}, ${JSON.stringify(chat.id)})`)
   assert.equal(saved.value.messages.length, 1)
   assert.match(saved.value.messages[0].content, /Roadmap notes/)
+  assert.match(saved.value.messages[0].content, /PDF attachment fixture/)
+  const [pasted, photo] = saved.value.messages[0].images
+  assert.deepEqual(pasted, { name: 'clipboard.png', dataUrl: sampleImage })
+  assert.equal(photo.name, 'photo.heic')
+  assert.match(photo.dataUrl, /^data:image\/jpeg;base64,\/9j\//)
   assert.equal(saved.value.messages[0].delivery, 'pending')
 
   await fill(input, 'Another draft', 'textarea')
@@ -733,6 +834,99 @@ try {
     assert.deepEqual(messages.map(message => message.content), ['Hold for steering', 'Steer the active reply'])
     assert.ok(messages.every(message => message.runId === beforeSteering.id))
     console.log('Workspace order, widths, splits, and saved tabs survived restart. Deleted tabs and malformed snapshots recovered.')
+
+    const repository = await evaluate(`window.granite.organization.createRepository(${JSON.stringify(agentId)}, ${JSON.stringify(release.id)})`)
+    assert.equal(repository.ok, true, repository.error)
+    const tools = await evaluate(`window.granite.harness.save(${JSON.stringify(agentId)}, {
+      instructions: '', terminal: true, approveWrites: true, skills: true, mcpServers: []
+    })`)
+    assert.equal(tools.ok, true, tools.error)
+    await evaluate(`[...document.querySelectorAll('.agent-explorer summary')]
+      .find(summary => summary.textContent.trim() === 'Release' && !summary.parentElement.open)?.click()`)
+
+    const activityFor = title => `(() => {
+      const tab = [...document.querySelectorAll('[role=tab][aria-selected=true]')].find(tab => tab.textContent.trim() === ${JSON.stringify(title)})
+      return tab?.closest('.pane').querySelector('.workspace-chat-activity')
+    })()`
+    const totals = title => evaluate(`${activityFor(title)}?.querySelector('.activity-line-totals')?.ariaLabel`)
+    const terminalCount = title => evaluate(`[...${activityFor(title)}?.querySelectorAll('.activity-disclosure') ?? []]
+      .find(button => button.querySelector('.activity-section-label').textContent === 'Terminal processes')
+      ?.querySelector('.activity-count').textContent`)
+    const baselineTitle = 'Project saved chat'
+    const liveTitle = 'Start a project chat'
+    const activityPosition = title => evaluate(`getComputedStyle(${activityFor(title)}.querySelector('.workspace-activity-panel')).position`)
+    const openCompactActivity = title => evaluate(`(() => {
+      const button = ${activityFor(title)}.querySelector('.workspace-activity-toggle')
+      if (button.getClientRects().length && button.ariaExpanded === 'false') button.click()
+    })()`)
+
+    await click(baselineTitle)
+    const baselineTab = await activeTabId()
+    await fill(composer, 'Write the baseline file', 'textarea')
+    await click('Send message')
+    await wait(() => transcriptContains('Baseline file written.'), 'baseline repository reply')
+    await wait(async () => await totals(baselineTitle) === '1 lines added, 0 lines removed', 'baseline line totals')
+    await rpc('Emulation.setDeviceMetricsOverride', { width: 1680, height: 900, deviceScaleFactor: 1, mobile: false })
+    await wait(async () => await activityPosition(baselineTitle) === 'static', 'wide chat shows the activity sidebar')
+    await click(liveTitle)
+    await wait(async () => await totals(liveTitle) === '0 lines added, 0 lines removed', 'switching tabs clears the previous chat’s totals')
+    await dragTab(baselineTab, content + ' .pane-body', 0.78, 0.5, '.pane-dock-preview')
+    await wait(async () => await totals(baselineTitle) === '1 lines added, 0 lines removed', 'docked chat restores its saved totals')
+    await wait(async () => await activityPosition(baselineTitle) === 'absolute' && await activityPosition(liveTitle) === 'absolute', 'both narrow panes use popovers')
+    assert.equal(await evaluate(`${activityFor(liveTitle)}.querySelector('.workspace-activity-panel').getClientRects().length`), 0)
+
+    const livePane = await evaluate(`${activityFor(liveTitle)}.closest('.pane').dataset.paneId`)
+    const liveScope = `[data-pane-id="${livePane}"]`
+    await fill(liveScope + ' textarea[aria-label="Message"]', 'Write a file and run a terminal', 'textarea')
+    await evaluate(`document.querySelector(${JSON.stringify(liveScope + ' .composer button[type=submit]')}).click()`)
+    await wait(async () => await totals(liveTitle) === '2 lines added, 0 lines removed' && await terminalCount(liveTitle) === '1', 'live line totals and terminal count')
+    assert.equal(await totals(baselineTitle), '1 lines added, 0 lines removed')
+    assert.equal(await terminalCount(baselineTitle), '0')
+    await openCompactActivity(liveTitle)
+    await evaluate(`[...${activityFor(liveTitle)}.querySelectorAll('.activity-disclosure')].forEach(button => button.click())`)
+    await evaluate(`${activityFor(liveTitle)}.querySelector('details:not(.repository-file-change) > summary').click()`)
+    await wait(() => evaluate(`${activityFor(liveTitle)}.querySelector('[aria-label="Terminal output"]')?.textContent.includes('Waiting for input')`), 'live terminal output')
+    await click('Stop task')
+    await wait(async () => await terminalCount(liveTitle) === '0', 'stopped terminal clears the count')
+
+    const baselineComposer = `[aria-labelledby="${baselineTab}"] .composer`
+    await evaluate(pasteImage(baselineComposer + ' textarea'))
+    await wait(() => evaluate(`document.querySelector(${JSON.stringify(baselineComposer + ' img')})?.naturalWidth === 1`), 'image thumbnail belongs to the selected chat')
+    assert.equal(await evaluate(`Boolean(${activityFor(liveTitle)}.closest('.pane').querySelector('.composer-attachments'))`), false)
+
+    await closeTab(baselineTab)
+    await wait(async () => !await tabPresent(baselineTab), 'baseline chat closes before reopening')
+    await click(baselineTitle)
+    await wait(async () => await totals(baselineTitle) === '1 lines added, 0 lines removed', 'reopened chat restores its line totals')
+    await openCompactActivity(baselineTitle)
+    await evaluate(`${activityFor(baselineTitle)}.querySelector('.activity-disclosure').click()`)
+    await wait(() => evaluate(`Boolean(${activityFor(baselineTitle)}.querySelector('.repository-file-change'))`), 'reopened chat loads its saved report')
+    await evaluate(`${activityFor(baselineTitle)}.querySelector('.repository-file-change > summary').click()`)
+    await wait(() => evaluate(`(() => {
+      const diff = ${activityFor(baselineTitle)}.querySelector('.repository-file-change pre')
+      return diff?.getBoundingClientRect().height > 0 && diff.textContent.includes('+baseline')
+    })()`), 'reopened chat shows its file diff')
+    console.log('Repository line totals, saved diffs, and live terminal output followed the correct workspace chat.')
+
+    const reopenedTab = await evaluate(`${activityFor(baselineTitle)}.closest('.pane').querySelector('[role=tab][aria-selected=true]').id`)
+    const reopenedComposer = `[aria-labelledby="${reopenedTab}"] .composer`
+    await wait(() => evaluate(`document.querySelector(${JSON.stringify(reopenedComposer + ' img')})?.naturalWidth === 1`), 'image thumbnail is restored when reopening the chat')
+    assert.equal(await evaluate(`document.querySelector(${JSON.stringify(reopenedComposer + ' textarea')}).value`), '')
+    await evaluate(`document.querySelector(${JSON.stringify(reopenedComposer + ' .send-button')}).click()`)
+    await wait(() => transcriptContains('Received the attached image.'), 'image-only message reaches the model as an image')
+    await wait(() => evaluate(`!document.querySelector(${JSON.stringify(reopenedComposer + ' .stop-button')})`), 'image-only reply settles')
+
+    const fullAttachment = 'Sample line for attachment testing.\n'.repeat(2000).slice(0, 64_000)
+    await evaluate(`(() => {
+      const input = document.querySelector(${JSON.stringify(reopenedComposer + ' input[type=file]')})
+      const transfer = new DataTransfer()
+      transfer.items.add(new File([${JSON.stringify(fullAttachment)}], 'full.txt', { type: 'text/plain' }))
+      input.files = transfer.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await wait(() => evaluate(`document.querySelector(${JSON.stringify(reopenedComposer + ' .send-button')})?.disabled === false`), '64 KB attachment is ready to send')
+    await evaluate(`document.querySelector(${JSON.stringify(reopenedComposer + ' .send-button')}).click()`)
+    await wait(() => prompts.some(prompt => prompt.includes(fullAttachment)), 'the local model receives all 64 KB of attached text')
   } finally {
     await desktop.quit()
   }

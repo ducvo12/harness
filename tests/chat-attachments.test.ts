@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { attachmentLimit, messageLimit, readAttachments, messageWithAttachments, sentAttachments } from '../src/renderer/src/features/chat/attachments.ts'
+import { attachmentTextLimit, messageTextLimit } from '../src/shared/chat-limits.ts'
+import { readAttachments, messageWithAttachments, sentAttachments } from '../src/renderer/src/features/chat/attachments.ts'
 
 test('text files are sent with the message and can be recovered from saved chat history', async () => {
   const files = await readAttachments([new File(['hello\nworld'], 'notes.md')], [])
@@ -24,10 +25,24 @@ test('attachment names and nested code fences round trip without ending an attac
 test('attachment limits reject binary data, invalid UTF-8, oversized batches and oversized messages', async () => {
   await assert.rejects(readAttachments([new File([new Uint8Array([0, 1])], 'image.png')], []), /text or code file/)
   await assert.rejects(readAttachments([new File([new Uint8Array([255])], 'invalid.txt')], []), /UTF-8/)
-  await assert.rejects(readAttachments([new File(['a'.repeat(attachmentLimit + 1)], 'large.txt')], []), /24 KB/)
-  const existing = await readAttachments([new File(['a'.repeat(attachmentLimit)], 'full.txt')], [])
-  await assert.rejects(readAttachments([new File(['b'], 'extra.txt')], existing), /24 KB/)
-  await assert.rejects(readAttachments(Array.from({ length: 6 }, (_, index) => new File(['a'], `${index}.txt`)), []), /5 text or code files/)
-  assert.throws(() => messageWithAttachments('a'.repeat(messageLimit), existing), /too long/)
+  await assert.rejects(readAttachments([new File(['a'.repeat(attachmentTextLimit + 1)], 'large.txt')], []), /64 KB/)
+  const existing = await readAttachments([new File(['a'.repeat(attachmentTextLimit)], 'full.txt')], [])
+  assert.equal(sentAttachments(messageWithAttachments('Review this file.', existing))[0].content.length, attachmentTextLimit)
+  await assert.rejects(readAttachments([new File(['b'], 'extra.txt')], existing), /64 KB/)
+  await assert.rejects(readAttachments(Array.from({ length: 6 }, (_, index) => new File(['a'], `${index}.txt`)), []), /5 files/)
+  assert.throws(() => messageWithAttachments('a'.repeat(messageTextLimit), existing), /too long/)
   assert.equal(existing.length, 1)
+})
+
+test('archives and disk images are rejected even when their contents look like text', async () => {
+  for (const file of [
+    new File(['plain text'], 'project.ZIP'),
+    new File(['plain text'], 'installer.dmg'),
+    new File(['plain text'], 'renamed.txt', { type: 'application/zip' })
+  ]) {
+    await assert.rejects(readAttachments([file], []), /archives and disk images can’t be attached/)
+  }
+
+  const [file] = await readAttachments([new File(['FROM scratch'], 'Dockerfile', { type: 'application/octet-stream' })], [])
+  assert.equal(file.content, 'FROM scratch')
 })
