@@ -6,7 +6,13 @@ import { readModelEvents } from './stream.ts'
 
 export function chatCompletionsAdapter(options: ModelOptions): ModelAdapter {
   return {
-    user: content => ({ role: 'user', content }),
+    user: (text, images) => ({
+      role: 'user',
+      content: images?.length ? [
+        ...(text ? [{ type: 'text', text }] : []),
+        ...images.map(image => ({ type: 'image_url', image_url: { url: image.dataUrl } }))
+      ] : text
+    }),
     assistant: content => ({ role: 'assistant', content }),
     toolResult: (call, content) => ({ role: 'tool', tool_call_id: call.id, content }),
     async step(input, instructions, tools) {

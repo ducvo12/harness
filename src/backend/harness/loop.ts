@@ -15,7 +15,8 @@ import { chatCompletionsAdapter } from './providers/chat-completions.ts'
 import type { RepositoryTools } from './tools/repository.ts'
 import { createToolRegistry } from './tools/registry.ts'
 
-type InitialInput = { history: AgentMessage[]; state?: NativeItem[]; messages: string[] }
+type UserInput = Pick<AgentMessage, 'content' | 'images'>
+type InitialInput = { history: AgentMessage[]; state?: NativeItem[]; messages: UserInput[] }
 
 export async function runHarness(options: {
   connection: Connection
@@ -38,7 +39,7 @@ export async function runHarness(options: {
   generation?: () => AbortController
   getSettings?: () => Promise<HarnessSettings>
   getInstructions?: () => Promise<string>
-  takeSteering?: () => string[]
+  takeSteering?: () => UserInput[]
   hasSteering?: () => boolean
   context?: ContextSession
   rebuildHistory?: () => AgentMessage[]
@@ -68,16 +69,16 @@ export async function runHarness(options: {
   let retry = 0
   let correcting = false
   let compactions = 0
-  const taskMessages: string[] = []
+  const taskMessages: UserInput[] = []
   const calls = new Set<string>()
   const staleEdits = new Map<string, number>()
 
   const initialize = () => {
     if (initialized) return
-    const initial = options.initialize?.() ?? { history: options.history, state: options.state, messages: [options.text] }
+    const initial = options.initialize?.() ?? { history: options.history, state: options.state, messages: [{ content: options.text }] }
     const model = adapter()
     input = initialHistory(initial.history, initial.state, model)
-    input.push(...initial.messages.map(model.user))
+    input.push(...initial.messages.map(message => model.user(message.content, message.images)))
     taskMessages.push(...initial.messages)
     for (const item of input) {
       if (item.type === 'function_call') calls.add(item.call_id)
@@ -109,7 +110,10 @@ export async function runHarness(options: {
         generationSignal.throwIfAborted()
         initialize()
         const model = adapter()
-        for (const text of options.takeSteering?.() ?? []) { input.push(model.user(text)); taskMessages.push(text) }
+        for (const message of options.takeSteering?.() ?? []) {
+          input.push(model.user(message.content, message.images))
+          taskMessages.push(message)
+        }
         const currentInstructions = await options.getInstructions?.() ?? options.instructions
         // A setting may change while the request waits in a capacity queue.
         const latest = await options.getSettings?.() ?? settings

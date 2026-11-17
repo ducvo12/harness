@@ -1,3 +1,4 @@
+import MessageImages from './MessageImages'
 import ContextSources from './ContextSources'
 import { replyQuestions } from './context-sources'
 import ThoughtActivity from './ThoughtActivity'
@@ -91,6 +92,8 @@ export default function MessageList({
           {message.delivery === 'pending' && <span className="message-delivery">Received · pending</span>}
           {message.delivery === 'cancelled' && <span className="message-delivery">Not processed · cancelled</span>}
 
+          <MessageImages images={message.images} />
+
           <div>
             {message.content ? (
               message.role === 'assistant' ? (
@@ -107,7 +110,7 @@ export default function MessageList({
                     …
                   </span>
                 </span>
-              ) : message.notice || message.questions?.length ? null : (
+              ) : message.notice || message.questions?.length || message.images?.length ? null : (
                 <span className="interrupted">
                   No answer received
                 </span>

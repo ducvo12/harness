@@ -6,7 +6,13 @@ import { readModelEvents } from './stream.ts'
 
 export function responsesAdapter(options: ModelOptions): ModelAdapter {
   return {
-    user: text => ({ role: 'user', content: [{ type: 'input_text', text }] }),
+    user: (text, images) => ({
+      role: 'user',
+      content: [
+        ...(text || !images?.length ? [{ type: 'input_text', text }] : []),
+        ...(images ?? []).map(image => ({ type: 'input_image', image_url: image.dataUrl, detail: 'auto' }))
+      ]
+    }),
     assistant: text => ({ role: 'assistant', content: [{ type: 'output_text', text }] }),
     toolResult: (call, output) => ({ type: 'function_call_output', call_id: call.id, output }),
     async step(input, instructions, tools) {

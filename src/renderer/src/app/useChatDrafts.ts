@@ -9,7 +9,7 @@ const draftSchema = z.object({
   id: z.string(),
   agentId: z.string(),
   text: z.string(),
-  attachments: z.array(z.object({ id: z.string(), name: z.string(), size: z.int(), content: z.string() })),
+  attachments: z.array(z.object({ id: z.string(), name: z.string(), size: z.int(), content: z.string(), dataUrl: z.optional(z.string()) })),
   location: z.optional(z.object({ sectionId: z.string(), projectId: z.nullable(z.string()) })),
   pendingId: z.optional(z.uuid())
 })

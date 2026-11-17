@@ -346,10 +346,11 @@ export default function WorkspaceApp() {
           onSelectConnection={selectConnection}
           onOpenSettings={() => setSettingsOpen(true)}
           onRetryConnections={retryConnections}
-          onSubmit={(connection, model, effort, text, intent) => chatSession.submit(
+          onSubmit={(connection, model, effort, text, intent, images) => chatSession.submit(
             identity, connection, model, effort, text, intent, intent === 'message' ? {
               messageId: chatDrafts.get(id)?.pendingId,
               location: conversation.location,
+              images,
               started: pendingId => {
                 chatDrafts.patch(conversation, { pendingId })
                 chatDrafts.checkpoint()

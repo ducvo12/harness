@@ -1,3 +1,4 @@
+import { validMessageImages, type MessageImage } from '../shared/message-images'
 import { app, BrowserWindow, dialog, ipcMain as main, safeStorage, shell, utilityProcess } from 'electron'
 import { join } from 'node:path'
 import type { IpcCalls, WorkerAction, WorkerArgs } from '../shared/ipc.ts'
@@ -13,6 +14,8 @@ import type { ConversationLocation } from '../shared/organization'
 import { realpath, stat } from 'node:fs/promises'
 import { RepositoryEditors } from './repository-editors'
 import { ConnectionUsageStore, type UsageBinding } from '../backend/connections/usage'
+import { convertAttachment } from './attachment-conversion'
+import { messageTextLimit } from '../shared/chat-limits'
 
 export function registerIpc(directory: string, legacyShell: boolean) {
   const ipcMain = {
@@ -65,6 +68,11 @@ export function registerIpc(directory: string, legacyShell: boolean) {
       throw new Error('Invalid sender')
     }
   }
+
+  ipcMain.handle('attachments:convert', (event, format, bytes) => {
+    trusted(event)
+    return safely(() => convertAttachment(format, bytes))
+  })
 
   // Apply only to the requesting window; account for native frame dimensions.
   ipcMain.handle('window:setMinimumSize', (event, width, height) => {
@@ -370,17 +378,17 @@ export function registerIpc(directory: string, legacyShell: boolean) {
     }
     return result
   })
-  ipcMain.handle('conversations:acceptMessage', (event, agentId, id, messageId, text, location) => {
+  ipcMain.handle('conversations:acceptMessage', (event, agentId, id, messageId, text, location, images) => {
     trusted(event)
     if (quitting || typeof agentId !== 'string' || !agentId || agentId.length > 64 ||
         typeof id !== 'string' || !id || id.length > 100 ||
         typeof messageId !== 'string' || !messageId || messageId.length > 100 ||
-        typeof text !== 'string' || !text.trim() || text.length > 32_000 ||
+        typeof text !== 'string' || text.length > messageTextLimit || !validMessageImages(images) || (!text.trim() && !images?.length) ||
         (location !== undefined && !validLocation(location))) {
       return { ok: false, error: 'Invalid message or chat location.' }
     }
 
-    return agents.call('acceptMessage', agentId, id, messageId, text, location)
+    return agents.call('acceptMessage', agentId, id, messageId, text, location, images)
   })
   ipcMain.handle('conversations:move', (event, agentId, id, location) => {
     trusted(event)
@@ -448,7 +456,8 @@ export function registerIpc(directory: string, legacyShell: boolean) {
       model?: string,
       effort?: string,
       intent: RunIntent = 'message',
-      messageId?: string
+      messageId?: string,
+      images?: MessageImage[]
     ) => {
       trusted(event)
 
@@ -462,7 +471,8 @@ export function registerIpc(directory: string, legacyShell: boolean) {
           typeof conversationId !== 'string' ||
           typeof agentId !== 'string' ||
           agentId.length > 64 || conversationId.length > 100 ||
-          typeof text !== 'string' || text.length > 32_000 ||
+          typeof text !== 'string' || text.length > messageTextLimit || !validMessageImages(images) ||
+          (intent !== 'message' && images?.length) ||
           !['message', 'continue', 'pending', 'accepted'].includes(intent) ||
           (intent === 'accepted' && (typeof messageId !== 'string' || !messageId || messageId.length > 100 || messageId === requestId))
         ) {
@@ -495,7 +505,7 @@ export function registerIpc(directory: string, legacyShell: boolean) {
             return { ok: true, value: { stopped: true } }
           }
 
-          const result = await agents.call('run', requestId, agentId, conversationId, connection, text, intent, messageId)
+          const result = await agents.call('run', requestId, agentId, conversationId, connection, text, intent, messageId, images)
           // Refresh availability, but never replay a run or its completed tools.
           await modelCatalog.refreshAfterError(connection, result)
           return result

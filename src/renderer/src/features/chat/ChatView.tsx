@@ -13,6 +13,7 @@ import QuestionPrompt from './QuestionPrompt'
 import ProjectEntryPrompt from './ProjectEntryPrompt'
 import ApprovalPrompt from '../harness/ApprovalPrompt'
 import type { ApprovalRequest } from '../../../../shared/harness'
+import { useAttachmentPicker } from './useAttachmentPicker'
 
 type Props = {
   conversationId: string
@@ -104,6 +105,7 @@ export default function ChatView({
   onStop
 }: Props) {
   const [panelOpen, setPanelOpen] = useState(true)
+  const attachmentPicker = useAttachmentPicker(JSON.stringify([agent?.id, conversationId]), attachments, onAttachmentsChange)
   const reasoningProgress = activity.reasoningCharacters
     ? ` · ${activity.reasoningCharacters.toLocaleString()} reasoning characters`
     : ''
@@ -186,6 +188,8 @@ export default function ChatView({
               messages={messages}
               draft={draft}
               attachments={attachments}
+              attachmentPicker={attachmentPicker}
+              onAttachmentsChange={onAttachmentsChange}
               busy={busy}
               loaded={loaded}
               submitting={submitting}
@@ -204,7 +208,6 @@ export default function ChatView({
         </main>
       {panelOpen && <ActivityPanel key={`${agent?.id}:${conversationId}:${project?.id ?? section?.id}`} agentId={agent?.id ?? ''} conversationId={conversationId}
         repository={Boolean(project?.repositoryPath)} busy={busy} stopping={stopping} run={run} messages={messages}
-        attachments={attachments} disabled={!agent || !loaded || submitting} onAttachmentsChange={onAttachmentsChange}
         onStop={onStop} />}
       </div>
     </div>

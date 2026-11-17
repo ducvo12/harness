@@ -1,3 +1,4 @@
+import MessageImages from './MessageImages'
 import { useEffectEvent, useLayoutEffect, useRef } from 'react'
 import type { AgentMessage, ConversationDetail } from '../../../../shared/agent'
 import type { Result } from '../../../../shared/chat'
@@ -99,7 +100,9 @@ function Transcript({ title, entries, path, readPosition, savePosition, emptyTex
           <article className="saved-message" data-message-id={message.id} key={message.id}>
             <p className="message-role">{message.role === 'user' ? 'You' : path[0]}</p>
 
-            {message.role === 'assistant' ? <FormattedResponse text={message.content} /> : <p className="saved-user-message">{message.content}</p>}
+            <MessageImages images={message.images} />
+
+            {message.role === 'assistant' ? <FormattedResponse text={message.content} /> : message.content && <p className="saved-user-message">{message.content}</p>}
 
             {message.error && <p className="saved-message-status">{message.error}</p>}
             {message.interrupted && <p className="saved-message-status">Interrupted</p>}

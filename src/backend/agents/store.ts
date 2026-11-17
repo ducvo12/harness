@@ -1,3 +1,4 @@
+import type { MessageImage } from '../../shared/message-images.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { chmodSync } from 'node:fs'
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
@@ -154,20 +155,21 @@ export class AgentStore {
     return { ...conversation, messages: [] }
   }
 
-  acceptMessage(agentId: string, id: string, messageId: string, text: string, location?: ConversationLocation) {
+  acceptMessage(agentId: string, id: string, messageId: string, text: string, location?: ConversationLocation, images?: MessageImage[]) {
     return this.saver.db.transaction(() => {
       const prior = this.saver.db.prepare('SELECT conversationId, data FROM messages WHERE id = ?').get(messageId) as
         { conversationId: string; data: string } | undefined
       if (prior) {
         const message = JSON.parse(prior.data) as AgentMessage
-        if (prior.conversationId !== id || message.role !== 'user' || message.content !== text) {
+        if (prior.conversationId !== id || message.role !== 'user' || message.content !== text ||
+            JSON.stringify(message.images ?? []) !== JSON.stringify(images ?? [])) {
           throw new Error('This message ID is already in use.')
         }
         return this.get(agentId, id)
       }
 
       const chat = location ? this.create(agentId, location, 'permanent', id) : this.get(agentId, id)
-      this.saveUserMessage(chat, { id: messageId, role: 'user', content: text, delivery: 'pending' })
+      this.saveUserMessage(chat, { id: messageId, role: 'user', content: text, images, delivery: 'pending' })
       return this.get(agentId, id)
     })()
   }
@@ -175,7 +177,7 @@ export class AgentStore {
   saveUserMessage(chat: ConversationDetail, message: AgentMessage) {
     if (!chat.messages.length && chat.title === 'New conversation') {
       this.saver.db.prepare('UPDATE conversations SET title = ? WHERE id = ?')
-        .run(message.content.slice(0, 64), chat.id)
+        .run((message.content || message.images?.[0]?.name || '').slice(0, 64), chat.id)
     }
     this.saveMessage(chat.id, message)
   }

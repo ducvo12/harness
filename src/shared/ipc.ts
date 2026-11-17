@@ -1,4 +1,5 @@
 import type { Connection, GraniteBridge, Result, StreamDelta } from './chat.ts'
+import type { MessageImage } from './message-images.ts'
 import type { RunIntent } from './run.ts'
 
 type Method = (...args: any[]) => Promise<unknown>
@@ -13,7 +14,7 @@ export type IpcCalls = Group<'agents', GraniteBridge['agents']> &
   Group<'organization', GraniteBridge['organization']> & Group<'context', GraniteBridge['context']> &
   Group<'workspace', GraniteBridge['workspace']> & Group<'setup', GraniteBridge['setup']> &
   Group<'previews', GraniteBridge['previews']> & Group<'repositories', GraniteBridge['repositories']> &
-  Group<'runs', GraniteBridge['runs']> & {
+  Group<'runs', GraniteBridge['runs']> & Group<'attachments', GraniteBridge['attachments']> & {
     'conversations:responseDuration': GraniteBridge['conversations']['saveResponseDuration']
     'window:setMinimumSize': GraniteBridge['window']['setMinimumSize']
     'model:list': GraniteBridge['models']
@@ -22,7 +23,7 @@ export type IpcCalls = Group<'agents', GraniteBridge['agents']> &
   }
 
 type WorkerChannels = Exclude<keyof IpcCalls,
-  'window:setMinimumSize' | `connections:${string}` | `chatgpt:${string}` | `model:${string}` | `conversations:${string}` |
+  'window:setMinimumSize' | `connections:${string}` | `chatgpt:${string}` | `model:${string}` | `conversations:${string}` | `attachments:${string}` |
   `workspace:${string}` | 'organization:pickRepositoryFolder' | 'organization:chooseRepository' |
   'repositories:editors' | 'repositories:open' | 'repositories:chooseEditor' | 'previews:open'>
 
@@ -43,7 +44,7 @@ export type WorkerActions = { [Key in WorkerChannels]: RequestFor<IpcCalls[Key]>
   'workspace:save': RequestFor<GraniteBridge['workspace']['save']>
   'workspace:renameNote': RequestFor<GraniteBridge['workspace']['renameNote']>
   'organization:attachRepository': { args: [agentId: string, projectId: string, path: string]; value: import('./organization.ts').Project }
-  run: { args: [requestId: string, agentId: string, conversationId: string, connection: Connection, text: string, intent?: RunIntent, messageId?: string]; value: { stopped: boolean; steered?: boolean; runId?: string } }
+  run: { args: [requestId: string, agentId: string, conversationId: string, connection: Connection, text: string, intent?: RunIntent, messageId?: string, images?: MessageImage[]]; value: { stopped: boolean; steered?: boolean; runId?: string } }
   stop: { args: [requestId: string]; value: void }
 }
 

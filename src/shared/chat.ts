@@ -1,3 +1,5 @@
+import type { MessageImage } from './message-images'
+import type { AttachmentFormat, ConvertedAttachment } from './attachment-conversion'
 import type { Agent, Conversation, ConversationDetail, ToolActivity, WorkspaceEntry } from './agent'
 import type { ApprovalRequest, ChatGPTAccount, HarnessSettings } from './harness'
 import type { AgentOrganization, ChatRetention, ConversationLocation, Project, Section, SectionMode } from './organization'
@@ -84,6 +86,9 @@ export interface StreamDelta {
 
 export interface GraniteBridge {
   platform: string
+  attachments: {
+    convert: (format: AttachmentFormat, bytes: Uint8Array) => Promise<Result<ConvertedAttachment>>
+  }
   window: {
     setMinimumSize: (width: number, height: number) => Promise<Result<void>>
   }
@@ -122,7 +127,7 @@ export interface GraniteBridge {
     saveResponseDuration: (agentId: string, id: string, messageId: string, durationMs: number) => Promise<Result<void>>
     list: (agentId: string) => Promise<Result<Conversation[]>>
     create: (agentId: string, location?: Partial<ConversationLocation>, retention?: ChatRetention) => Promise<Result<ConversationDetail>>
-    acceptMessage: (agentId: string, id: string, messageId: string, text: string, location?: ConversationLocation) => Promise<Result<ConversationDetail>>
+    acceptMessage: (agentId: string, id: string, messageId: string, text: string, location?: ConversationLocation, images?: MessageImage[]) => Promise<Result<ConversationDetail>>
     keep: (agentId: string, id: string) => Promise<Result<ConversationDetail>>
     move: (agentId: string, id: string, location: ConversationLocation) => Promise<Result<ConversationDetail>>
     rename: (agentId: string, id: string, title: string) => Promise<Result<void>>
@@ -185,7 +190,8 @@ export interface GraniteBridge {
     model?: string,
     effort?: string,
     intent?: RunIntent,
-    messageId?: string
+    messageId?: string,
+    images?: MessageImage[]
   ) => Promise<Result<{ stopped: boolean; steered?: boolean; runId?: string }>>
   stop: (requestId: string) => Promise<void>
   onDelta: (callback: (delta: StreamDelta) => void) => () => void

@@ -1,12 +1,13 @@
-import type { RefObject } from 'react'
+import { useRef, type RefObject } from 'react'
 import type { Agent, AgentMessage } from '../../../../shared/agent'
 import type { SavedConnection } from '../../../../shared/chat'
 import type { RunSnapshot } from '../../../../shared/run'
-import type { ChatAttachment } from './attachments'
+import { attachmentAccept, type ChatAttachment } from './attachments'
 import ChatModelPicker from './ChatModelPicker'
 import ContextIndicator from './ContextIndicator'
 import { latestContextResponse } from './context-display'
 import type { ModelSelection } from './useConnectionModel'
+import type { useAttachmentPicker } from './useAttachmentPicker'
 
 interface ChatComposerProps {
   agent: Agent | undefined
@@ -16,6 +17,8 @@ interface ChatComposerProps {
   messages: AgentMessage[]
   draft: string
   attachments: ChatAttachment[]
+  attachmentPicker: ReturnType<typeof useAttachmentPicker>
+  onAttachmentsChange: (files: ChatAttachment[]) => void
   busy: boolean
   loaded: boolean
   submitting: boolean
@@ -33,24 +36,46 @@ interface ChatComposerProps {
 }
 
 export default function ChatComposer({
-  agent, connections, connection, modelSelection, messages, draft, attachments,
+  agent, connections, connection, modelSelection, messages, draft, attachments, attachmentPicker,
   busy, loaded, submitting, stopping, identityDirty, canSendWithoutModel, run, progress, messageInput,
-  onSelectConnection, onOpenSettings, onDraftChange, onSend, onStop
+  onSelectConnection, onOpenSettings, onDraftChange, onAttachmentsChange, onSend, onStop
 }: ChatComposerProps) {
   const contextResponse = latestContextResponse(messages, modelSelection.model)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const attachmentDisabled = !agent || !loaded || submitting || attachmentPicker.reading
+  const status = busy ? progress : 'Enter to send · Shift + Enter for a new line'
 
   return (
     <form
       className={`composer ${busy ? 'generating' : ''}`}
       onSubmit={event => {
         event.preventDefault()
-        void onSend()
+        if (!attachmentPicker.reading) void onSend()
       }}
     >
       <div className="composer-prompt-header" aria-hidden="true">
         <span className="composer-prompt-icon">✦</span>
         <span className="composer-prompt-host">archon:~$</span>
       </div>
+
+      {attachments.length > 0 && (
+        <ul className="composer-attachments" aria-label="Draft attachments">
+          {attachments.map(file => (
+            <li key={file.id} className="composer-attachment" title={file.name}>
+              {file.dataUrl && <img src={file.dataUrl} alt="" />}
+
+              <span>
+                {file.name}
+              </span>
+
+              <button type="button" className="quiet-button" aria-label={`Remove ${file.name}`}
+                disabled={attachmentDisabled} onClick={() => onAttachmentsChange(attachments.filter(item => item.id !== file.id))}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <textarea
         ref={messageInput}
@@ -64,20 +89,51 @@ export default function ChatComposer({
         }
         rows={2}
         onChange={event => onDraftChange(event.target.value)}
+        onPaste={event => {
+          if (attachmentDisabled) return
+          const images = Array.from(event.clipboardData.files).filter(file => file.type.startsWith('image/'))
+          if (!images.length) return
+
+          if (!event.clipboardData.getData('text/plain')) event.preventDefault()
+          void attachmentPicker.attach(images)
+        }}
         onKeyDown={event => {
           if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault()
 
-            if (!submitting) {
+            if (!submitting && !attachmentPicker.reading) {
               void onSend()
             }
           }
         }}
       />
 
+      <input ref={fileInput} type="file" accept={attachmentAccept(window.granite.platform)} multiple hidden disabled={attachmentDisabled}
+        onChange={event => {
+          const files = Array.from(event.currentTarget.files ?? [])
+          event.currentTarget.value = ''
+          void attachmentPicker.attach(files)
+        }} />
+
+      {attachmentPicker.error && (
+        <p className="activity-error" role="alert">
+          {attachmentPicker.error}
+        </p>
+      )}
+
       <div className="composer-controls">
+        <button type="button" className="composer-attach quiet-button" aria-label="Attach files"
+          title={window.granite.platform === 'darwin' ? 'Attach PDFs, images, text, or code files' : 'Attach images, text, or code files'}
+          disabled={attachmentDisabled}
+          onClick={() => fileInput.current?.click()}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+
         <span className="composer-status">
-          {busy ? progress : 'Enter to send · Shift + Enter for a new line'}
+          {attachmentPicker.reading ? 'Reading files…' : status}
         </span>
 
         <div className="composer-actions">
@@ -125,7 +181,7 @@ export default function ChatComposer({
               className="send-button"
               aria-label={busy ? 'Send update' : 'Send message'}
               title={busy ? 'Send a message to steer this run' : 'Send message'}
-              disabled={submitting || (!draft.trim() && !attachments.length) || (!modelSelection.ready && !canSendWithoutModel) || !agent || !loaded}
+              disabled={attachmentDisabled || (!draft.trim() && !attachments.length) || (!modelSelection.ready && !canSendWithoutModel)}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 19V5m-6 6 6-6 6 6" />

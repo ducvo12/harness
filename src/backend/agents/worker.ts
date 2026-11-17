@@ -205,7 +205,8 @@ port.on('message', async ({ data }: { data: Request }) => {
               args[4],
               (delta: StreamDelta) => port.postMessage({ delta }),
               args[5],
-              args[6]
+              args[6],
+              args[7]
             )
           } finally {
             stopped.delete(args[0])

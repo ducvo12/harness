@@ -1,16 +1,14 @@
 import type { AgentMessage } from '../../../../shared/agent'
 import type { RunSnapshot } from '../../../../shared/run'
-import type { ChatAttachment } from './attachments'
 import RepositoryActivity from './RepositoryActivity'
 import ProjectActivity from './ProjectActivity'
 import AttachedFiles from './AttachedFiles'
 import ActivitySection from './ActivitySection'
 import ContextActivity from './ContextActivity'
 
-export default function ActivityPanel({ agentId, conversationId, repository, busy, stopping, run, messages, attachments, disabled, onAttachmentsChange, onStop }: {
+export default function ActivityPanel({ agentId, conversationId, repository, busy, stopping, run, messages, onStop }: {
   agentId: string; conversationId: string; repository: boolean; busy: boolean; stopping: boolean
-  run?: RunSnapshot; messages: AgentMessage[]; attachments: ChatAttachment[]; disabled: boolean
-  onAttachmentsChange: (files: ChatAttachment[]) => void
+  run?: RunSnapshot; messages: AgentMessage[]
   onStop: () => Promise<void>
 }) {
   return (
@@ -19,7 +17,7 @@ export default function ActivityPanel({ agentId, conversationId, repository, bus
         <RepositoryActivity agentId={agentId} conversationId={conversationId} busy={busy} stopping={stopping} run={run} onStop={onStop}>
           <ContextActivity agentId={agentId} chatId={conversationId} messages={messages} />
 
-          <AttachedFiles key={`${agentId}:${conversationId}`} attachments={attachments} messages={messages} disabled={disabled} onChange={onAttachmentsChange} />
+          <AttachedFiles key={`${agentId}:${conversationId}`} messages={messages} />
         </RepositoryActivity>
 
         {repository && agentId && conversationId ? <ProjectActivity agentId={agentId} chatId={conversationId} busy={busy} />

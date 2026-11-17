@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from 'react'
+import type { MessageImage } from '../../../../shared/message-images'
 import type { Agent, AgentMessage } from '../../../../shared/agent'
 import type { Result, SavedConnection } from '../../../../shared/chat'
 import { isLiveRun, type RunIntent } from '../../../../shared/run'
@@ -10,8 +11,9 @@ import QuestionPrompt from './QuestionPrompt'
 import RepositoryActivity from './RepositoryActivity'
 import RunControls, { runLabel } from './RunControls'
 import SavedTranscript, { type ReadingPosition } from './SavedTranscript'
-import { messageWithAttachments, type ChatAttachment } from './attachments'
+import { imagesFromAttachments, messageWithAttachments, type ChatAttachment } from './attachments'
 import { chatModelBinding, useConnectionModel } from './useConnectionModel'
+import { useAttachmentPicker } from './useAttachmentPicker'
 
 export interface ComposerDraft {
   text: string
@@ -31,7 +33,7 @@ interface WorkspaceChatProps {
   onSelectConnection: (id: string) => void
   onOpenSettings: () => void
   onRetryConnections: () => void
-  onSubmit: (connection: SavedConnection | undefined, model: string, effort: string, text: string, intent: RunIntent) => Promise<void>
+  onSubmit: (connection: SavedConnection | undefined, model: string, effort: string, text: string, intent: RunIntent, images?: MessageImage[]) => Promise<void>
   onError: (error: string) => void
   onReload: () => void
   readPosition: () => ReadingPosition | undefined
@@ -54,6 +56,8 @@ export default function WorkspaceChat({
   const { connection, model, effort } = chatModelBinding(savedConnections, selectedConnection, messages, run)
   const modelSelection = useConnectionModel(connection, model, conversationId, effort)
   const loaded = !conversationId || result?.ok === true
+  const changeAttachments = (attachments: ChatAttachment[]) => onDraftChange({ attachments })
+  const attachmentPicker = useAttachmentPicker(draftId, draft.attachments, changeAttachments)
   const transcript = result?.ok ? { ok: true as const, value: { ...result.value, messages } } : result
   const [activityOpen, setActivityOpen] = useState(false)
   const activityId = useId()
@@ -72,7 +76,7 @@ export default function WorkspaceChat({
       onError(error instanceof Error ? error.message : 'Could not prepare attachments.')
       return
     }
-    await onSubmit(available, modelSelection.model, modelSelection.effort, text, intent)
+    await onSubmit(available, modelSelection.model, modelSelection.effort, text, intent, intent === 'message' ? imagesFromAttachments(draft.attachments) : undefined)
   }
 
   async function request(action: () => Promise<Result<void>>): Promise<boolean> {
@@ -117,7 +121,9 @@ export default function WorkspaceChat({
 
             <aside id={activityId} className="workspace-activity-panel" aria-label="Chat activity">
               <RepositoryActivity key={JSON.stringify([agent.id, conversationId])} agentId={agent.id}
-                conversationId={conversationId} busy={busy} stopping={run?.phase === 'stopping'} run={run} onStop={stop} />
+                conversationId={conversationId} busy={busy} stopping={run?.phase === 'stopping'} run={run} onStop={stop}>
+                <AttachedFiles messages={messages} />
+              </RepositoryActivity>
             </aside>
           </div>
         )}
@@ -176,11 +182,9 @@ export default function WorkspaceChat({
             </div>
           )}
 
-          <AttachedFiles attachments={draft.attachments} messages={messages} disabled={!loaded || submitting}
-            onChange={attachments => onDraftChange({ attachments })} />
-
           <ChatComposer agent={agent} connections={savedConnections} connection={connection} modelSelection={modelSelection}
-            messages={messages} draft={draft.text} attachments={draft.attachments} busy={busy} loaded={loaded} submitting={submitting}
+            messages={messages} draft={draft.text} attachments={draft.attachments} attachmentPicker={attachmentPicker} onAttachmentsChange={changeAttachments}
+            busy={busy} loaded={loaded} submitting={submitting}
             canSendWithoutModel stopping={run?.phase === 'stopping'} run={run} progress={run ? runLabel(run) : ''}
             onSelectConnection={onSelectConnection} onOpenSettings={onOpenSettings}
             onDraftChange={text => onDraftChange({ text })} onSend={() => send('message')} onStop={stop} />

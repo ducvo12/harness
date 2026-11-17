@@ -1,6 +1,7 @@
+import type { AgentMessage } from '../../shared/agent.ts'
 import type { Connection } from '../../shared/chat.ts'
 import type { HarnessSettings } from '../../shared/harness.ts'
-import { budgetedCut, contextBudget } from '../context/budget.ts'
+import { budgetedCut, contextBudget, describeNativeImages } from '../context/budget.ts'
 import type { ContextSession } from '../context/session.ts'
 import { chatCompletionsAdapter } from './providers/chat-completions.ts'
 import { responsesAdapter } from './providers/responses.ts'
@@ -12,7 +13,7 @@ export async function prepareContext(options: {
   input: NativeItem[]
   instructions: string
   tools: ToolDefinition[]
-  taskMessages: string[]
+  taskMessages: Pick<AgentMessage, 'content' | 'images'>[]
   model: ModelAdapter
   signal: AbortSignal
   context?: ContextSession
@@ -28,11 +29,11 @@ export async function prepareContext(options: {
   }
   if (budget.inputTokens <= budget.inputBudget * .8) return { input, instructions, budget, compacted: false }
 
-  const pinned = options.taskMessages.map(text => model.user(`[Current run user direction, retained verbatim]\n${text}`))
+  const pinned = options.taskMessages.map(message => model.user(`[Current run user direction, retained verbatim]\n${message.content}`, message.images))
   const cut = budgetedCut(connection, settings, input, instructions, tools, pinned)
   if (!cut) throw new HarnessError('Required recent context and tool schemas exceed this model’s input budget. Configure the actual context window or start a new chat. Saved history remains intact.')
   options.onCompacting()
-  const source = JSON.stringify(input.slice(0, cut).filter(item => item.type !== 'reasoning'))
+  const source = JSON.stringify(describeNativeImages(input.slice(0, cut).filter(item => item.type !== 'reasoning')).items)
   const adapter = connection.protocol === 'responses' || connection.provider === 'chatgpt' ? responsesAdapter : chatCompletionsAdapter
   const compactModel = adapter({
     connection: { ...connection, maxOutputTokens: Math.min(2048, budget.output) },

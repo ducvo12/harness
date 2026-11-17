@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { MessageImage } from '../../../shared/message-images'
 import type { AgentMessage, ConversationDetail } from '../../../shared/agent'
 import type { Result, SavedConnection } from '../../../shared/chat'
 import type { ConversationLocation } from '../../../shared/organization'
@@ -12,6 +13,7 @@ export interface ChatIdentity {
 }
 
 interface MessageSubmission {
+  images?: MessageImage[]
   messageId?: string
   location?: ConversationLocation
   started: (id: string) => void
@@ -202,7 +204,7 @@ export function useWorkspaceChats() {
     try {
       if (message && messageId) {
         message.started(messageId)
-        const accepted = await window.granite.conversations.acceptMessage(identity.agentId, identity.id, messageId, text, message.location)
+        const accepted = await window.granite.conversations.acceptMessage(identity.agentId, identity.id, messageId, text, message.location, message.images)
         if (!accepted.ok) {
           setError(key, accepted.error)
           return

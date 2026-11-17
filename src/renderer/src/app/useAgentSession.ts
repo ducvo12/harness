@@ -1,4 +1,4 @@
-import { messageWithAttachments, type ChatAttachment } from '../features/chat/attachments'
+import { imagesFromAttachments, messageWithAttachments, type ChatAttachment } from '../features/chat/attachments'
 import { ConversationStream } from './conversation-stream'
 import { responseClock } from '../features/chat/response-clock'
 import { beginTiming, recordDelta, finishTiming, bindTiming } from '../features/chat/devTimings'
@@ -292,7 +292,7 @@ export function useAgentSession() {
       // IPC remains pending until a new run settles; a steering submission
       // returns immediately and names the existing run. Neither blocks navigation.
       const pending = window.granite.stream(requestId, owner, id, connection.id, text,
-        connection.provider === 'chatgpt' ? modelSelection.model : undefined, modelSelection.effort, intent)
+        connection.provider === 'chatgpt' ? modelSelection.model : undefined, modelSelection.effort, intent, undefined, intent === 'message' ? imagesFromAttachments(attachments) : undefined)
       const result = await pending
       finishTiming(requestId)
       if (!result.ok) {

@@ -109,11 +109,6 @@
   padding: 0 8px 8px;
 }
 
-.workspace-chat .composer-area .activity-section-content {
-  max-height: 8rem;
-  overflow: auto;
-}
-
 .workspace-chat-activity {
   grid-area: activity;
   position: relative;

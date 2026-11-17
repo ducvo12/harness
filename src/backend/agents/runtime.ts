@@ -1,3 +1,5 @@
+import type { MessageImage } from '../../shared/message-images.ts'
+import { messageTextLimit } from '../../shared/chat-limits.ts'
 import { ContextService } from '../context/service.ts'
 import { ContextSession, safeHistory } from '../context/session.ts'
 import { revision } from '../context/store.ts'
@@ -297,10 +299,10 @@ export class AgentRuntime {
     }
   }
 
-  async acceptMessage(agentId: string, id: string, messageId: string, text: string, location?: ConversationLocation) {
+  async acceptMessage(agentId: string, id: string, messageId: string, text: string, location?: ConversationLocation, images?: MessageImage[]) {
     await this.registry.get(agentId)
     if (this.changingAgents) throw new Error('Finish the current operation before sending a message.')
-    return this.store.acceptMessage(agentId, id, messageId, text.trim(), location)
+    return this.store.acceptMessage(agentId, id, messageId, text.trim(), location, images)
   }
 
   async organization(agentId: string) {
@@ -622,10 +624,10 @@ export class AgentRuntime {
 
   async run(
     requestId: string, agentId: string, conversationId: string, connection: Connection,
-    text: string, emit: (delta: StreamDelta) => void, intent: RunIntent = 'message', messageId?: string
+    text: string, emit: (delta: StreamDelta) => void, intent: RunIntent = 'message', messageId?: string, images?: MessageImage[]
   ) {
     if (this.editingIdentity || this.changingAgents) throw new Error('Finish the current settings operation first.')
-    if (typeof text !== 'string' || (intent === 'message' && !text.trim()) || text.length > 32_000 ||
+    if (typeof text !== 'string' || (intent === 'message' && !text.trim() && !images?.length) || text.length > messageTextLimit ||
         typeof requestId !== 'string' || !requestId || requestId.length > 100 ||
         !['message', 'continue', 'pending', 'accepted'].includes(intent) || !connection.model ||
         connection.maxConcurrentRequests !== undefined && (!Number.isInteger(connection.maxConcurrentRequests) || connection.maxConcurrentRequests < 1 || connection.maxConcurrentRequests > 32)) {
@@ -647,7 +649,7 @@ export class AgentRuntime {
     const current = this.chats.get(conversationId)
     if (current?.accepting && current.run.phase !== 'stopping') {
       if (intent !== 'message' && !accepted) throw new Error('This chat already has pending or active work.')
-      const message = accepted ? this.store.runs.adopt(current.run, accepted) : this.store.runs.append(current.run, text.trim())
+      const message = accepted ? this.store.runs.adopt(current.run, accepted) : this.store.runs.append(current.run, text.trim(), images)
       const projectId = this.store.get(agentId, conversationId).projectId
       if (projectId) this.authorization.message(current.run.id, agentId, conversationId, projectId, message)
       this.publishMessages(current)
@@ -670,7 +672,7 @@ export class AgentRuntime {
       createdAt: Date.now(), startedAt: null, endedAt: null, messageIds: [],
       queue: { reason: current ? 'Waiting for the previous run to finish cleanup' : 'Waiting for model capacity', position: 1 }
     }
-    this.store.runs.accept(run, intent === 'continue' ? 'Continue the interrupted task using the original request, corrections and actual completed outcomes. Do not repeat completed actions.' : text.trim(), existing)
+    this.store.runs.accept(run, intent === 'continue' ? 'Continue the interrupted task using the original request, corrections and actual completed outcomes. Do not repeat completed actions.' : text.trim(), existing, images)
     const job: Job = { run, controller: new AbortController(), emit, done: Promise.resolve({ stopped: false }), accepting: true }
     this.jobs.set(requestId, job)
     this.chats.set(conversationId, job)
@@ -829,7 +831,7 @@ export class AgentRuntime {
             return {
               history: current.history,
               state: state ?? (first && !current.recovered ? this.store.modelState(conversationId, sessionKey(connection)) : undefined),
-              messages: pending.map(message => message.content)
+              messages: pending
             }
           },
           getSettings: settings,
@@ -862,7 +864,7 @@ export class AgentRuntime {
               splitReply()
               this.publishMessages(job)
             }
-            return pending.map(message => message.content)
+            return pending
           },
           onPhase: (phase, queue) => { if (!signal.aborted) this.publish(job, phase, queue) },
           onText: text => {

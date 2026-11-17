@@ -1,3 +1,4 @@
+import type { MessageImage } from '../../shared/message-images.ts'
 import { randomUUID, createHash } from 'node:crypto'
 import type { AgentStore } from './store.ts'
 import type { AgentMessage } from '../../shared/agent.ts'
@@ -52,22 +53,22 @@ export class RunStore {
     this.store.saver.db.prepare('INSERT OR IGNORE INTO chat_sessions VALUES (?, ?)').run(conversationId, binding)
   }
 
-  accept(run: RunSnapshot, text: string, existing: AgentMessage[] = []) {
+  accept(run: RunSnapshot, text: string, existing: AgentMessage[] = [], images?: MessageImage[]) {
     this.store.saver.db.transaction(() => {
       if (existing.length) {
         for (const message of existing) {
           this.include(run, message)
         }
       } else {
-        this.append(run, text)
+        this.append(run, text, images)
       }
       this.save(run)
     })()
   }
 
-  append(run: RunSnapshot, text: string) {
+  append(run: RunSnapshot, text: string, images?: MessageImage[]) {
     const message: AgentMessage = {
-      id: randomUUID(), role: 'user', content: text, runId: run.id, delivery: 'pending',
+      id: randomUUID(), role: 'user', content: text, images, runId: run.id, delivery: 'pending',
       model: run.model, connectionId: run.connectionId, effort: run.effort
     }
     this.store.saver.db.transaction(() => {

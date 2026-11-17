@@ -5,13 +5,32 @@ import type { HarnessSettings } from '../../shared/harness.ts'
 import type { NativeItem, ToolDefinition } from '../harness/types.ts'
 let encoder: Tiktoken | undefined
 
+export function describeNativeImages(input: NativeItem[]) {
+  let imageCount = 0
+  const items = input.map(item => {
+    if (item.role !== 'user' || !Array.isArray(item.content)) return item
+
+    const content = item.content.map(part => {
+      if (part.type !== 'input_image' && part.type !== 'image_url') return part
+
+      imageCount++
+      return { type: part.type, image_url: '[Attached image]' }
+    })
+    return { ...item, content }
+  })
+  return { items, imageCount }
+}
+
 export function contextBudget(connection: Connection, settings: HarnessSettings, input: NativeItem[], instructions: string, tools: ToolDefinition[]) {
   const window = settings.contextWindow ?? connection.contextWindow ?? 32768
   const output = Math.min(settings.maxOutputTokens ?? connection.maxOutputTokens ?? 4096, Math.floor(window / 4))
   const inputBudget = window - Math.max(Math.ceil(window * .25), output)
-  const text = JSON.stringify({ instructions, input, tools: tools.map(({ name, description, parameters }) => ({ name, description, parameters })) })
+  const { items, imageCount } = describeNativeImages(input)
+  const text = JSON.stringify({ instructions, input: items, tools: tools.map(({ name, description, parameters }) => ({ name, description, parameters })) })
   const compatible = /^(gpt-4o|gpt-4\.1|gpt-5|o[134])/.test(connection.model)
-  const inputTokens = compatible ? (encoder ??= new Tiktoken(ranks)).encode(text, [], []).length + 256 : Math.ceil(Buffer.byteLength(text) / 3) + 256
+  const textTokens = compatible ? (encoder ??= new Tiktoken(ranks)).encode(text, [], []).length : Math.ceil(Buffer.byteLength(text) / 3)
+  // Encoded bytes are transport data. Reserve context for each image separately.
+  const inputTokens = textTokens + 256 + imageCount * 2048
   return { window, output, inputTokens, inputBudget, counting: `${compatible ? 'o200k tokenizer + protocol allowance' : 'conservative UTF-8 estimate'}; ${settings.contextWindow ? 'configured window' : connection.contextWindow ? 'provider window' : '32,768 fallback window'}`, compactions: 0 }
 }
 

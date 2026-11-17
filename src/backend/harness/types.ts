@@ -1,3 +1,4 @@
+import type { MessageImage } from '../../shared/message-images.ts'
 import type { Connection, ContextUsage } from '../../shared/chat.ts'
 import type { RateLimitWindow } from '../../shared/connection-usage.ts'
 
@@ -30,7 +31,7 @@ export interface ModelStep {
 }
 
 export interface ModelAdapter {
-  user: (text: string) => NativeItem
+  user: (text: string, images?: MessageImage[]) => NativeItem
   assistant: (text: string) => NativeItem
   toolResult: (call: ToolCall, output: string) => NativeItem
   step: (input: NativeItem[], instructions: string, tools: ToolDefinition[]) => Promise<ModelStep>

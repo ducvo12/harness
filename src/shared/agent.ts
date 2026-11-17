@@ -1,3 +1,4 @@
+import type { MessageImage } from './message-images'
 import type { ContextUsage, Message } from './chat'
 
 export interface AgentDeletionResult {
@@ -23,6 +24,7 @@ export interface ToolActivity {
 }
 
 export interface AgentMessage extends Message {
+  images?: MessageImage[]
   sources?: import('./context').ContextReference[]
   contextStatus?: import('./context').ContextStatus
   runId?: string
