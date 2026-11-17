@@ -438,22 +438,27 @@ test('relinkProject updates repositoryPath, warns on duplicate link, and prevent
   }
 })
 
-test('temporary chat expiry, keep, and sweep', async () => {
+test('temporary chats expire unless kept and can only move into a project after Keep', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'granite-temp-chat-'))
   const runtime = await AgentRuntime.open(directory)
 
   try {
     const agent = await runtime.createAgent('Temporary Chat Agent')
-    // Create temporary chat
+    const section = await runtime.createSection(agent.id, 'Work', 'shared')
+    const project = await runtime.createProject(agent.id, section.id, 'Project')
+    const location = { sectionId: section.id, projectId: project.id }
     const tempChat = await runtime.createConversation(agent.id, undefined, 'temporary')
     assert.equal(tempChat.retention, 'temporary')
     assert.ok(tempChat.expiresAt !== null)
     assert.ok(tempChat.expiresAt > Date.now())
+    await assert.rejects(runtime.moveConversation(agent.id, tempChat.id, location), /Keep .*temporary chat/)
 
     // Keep converts it to permanent
     const kept = await runtime.keepConversation(agent.id, tempChat.id)
     assert.equal(kept.retention, 'permanent')
     assert.equal(kept.expiresAt, null)
+    const moved = await runtime.moveConversation(agent.id, tempChat.id, location)
+    assert.equal(moved.projectId, project.id)
 
     // Cannot keep an already permanent chat
     await assert.rejects(runtime.keepConversation(agent.id, tempChat.id), /already permanent/)

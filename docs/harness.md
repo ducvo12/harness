@@ -97,12 +97,14 @@ The filesystem backend remains a library utility; no external agent framework ru
 
 Run `npm test` for model-loop, OAuth, permissions, terminal-boundary, MCP subprocess, recovery, migration, and deletion tests. OAuth tests use locally signed tokens and a mock issuer; they do not log into a real ChatGPT account. A real user still completes the browser grant to enable their subscription connection.
 
-After `npm run build`, the macOS desktop acceptance checks use isolated temporary profiles:
+After `npm run build`, run `node scripts/verify-desktop.mjs` for a default
+workspace smoke check and `node scripts/verify-saved-chats-desktop.mjs` for
+workspace workflows. These focused macOS checks exercise the legacy shell
+with isolated temporary profiles:
 
 ```sh
 node scripts/verify-harness-desktop.mjs
 node scripts/verify-chatgpt-models-desktop.mjs
-node scripts/verify-desktop.mjs
 node scripts/verify-agents-desktop.mjs --offline
 ```
 

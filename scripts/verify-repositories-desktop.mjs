@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, readFile, lstat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 const usage = `Usage: node scripts/verify-repositories-desktop.mjs [entry] [--executable <path>] [--packaged]
 
@@ -62,7 +62,7 @@ if (entry && executable) {
 
 const directory = await mkdtemp(join(tmpdir(), 'granite-repository-ui-'))
 const profile = join(directory, 'profile')
-const desktop = desktopSession(profile, 9491, { ELECTRON_RENDERER_URL: '' }, entry ?? '.', executable)
+const desktop = legacyDesktopSession(profile, 9491, { ELECTRON_RENDERER_URL: '' }, entry ?? '.', executable)
 const { evaluate, fill, wait } = desktop
 const requests = []
 const failures = []

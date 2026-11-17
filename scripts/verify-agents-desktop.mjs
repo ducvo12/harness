@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { verifyDeletion } from './desktop/verify-deletion.mjs'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 // Acceptance test: agent creation, identity editing, and both introductions go
 // through actual React controls. Only connection setup uses the public bridge.
@@ -33,7 +33,7 @@ let server
 
 let session
 async function launch() {
-  session = desktopSession(directory, 9442, {}, '.', packaged ? './release/mac-arm64/Granite.app/Contents/MacOS/Granite' : undefined)
+  session = legacyDesktopSession(directory, 9442, {}, '.', packaged ? './release/mac-arm64/Granite.app/Contents/MacOS/Granite' : undefined)
   await session.launch()
   // Completed replies can still be revealing text; keep content checks deterministic.
   await session.rpc('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })

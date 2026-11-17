@@ -2,9 +2,15 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 
-// Existing desktop checks target the legacy shell unless they explicitly test the workspace.
+export function legacyDesktopSession(directory, port, environment, entry, executable) {
+  return desktopSession(directory, port, environment, entry, executable, { legacyShell: true })
+}
+
 export function desktopSession(directory, port, environment = {}, entry = '.', executable, options = {}) {
-  const legacyShell = options.legacyShell ?? true
+  const legacyShell = options.legacyShell ?? false
+  const ready = options.ready ?? (legacyShell
+    ? 'document.querySelector(".agent-dropdown-trigger")?.disabled === false'
+    : 'Boolean(document.querySelector(".workspace-app"))')
   const timeout = options.timeout ?? 20_000
   const shutdownTimeout = options.shutdownTimeout ?? 2_000
   const startProcess = options.spawn ?? spawn
@@ -194,10 +200,7 @@ export function desktopSession(directory, port, environment = {}, entry = '.', e
         if (socket.readyState === 1) resolve()
         else socket.addEventListener('open', resolve, { once: true })
       }), 'desktop WebSocket open')
-      await wait(
-        () => evaluate(options.ready ?? 'document.querySelector(".agent-dropdown-trigger")?.disabled === false'),
-        options.ready ? 'desktop shell ready' : 'agent registry loaded'
-      )
+      await wait(() => evaluate(ready), 'desktop shell ready')
     } catch (error) {
       try {
         await quit()

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 // Selected Pass 2 acceptance checks. No real provider, recovery, permission-change,
 // invalid-response, repository or personal-profile tests. Retains evidence in /tmp.
@@ -72,7 +72,7 @@ for (const [protocolIndex, protocol] of ['chat-completions', 'responses'].entrie
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
     servers.push(server)
   }
-  const desktop = desktopSession(join(directory, 'profile'), 9480 + protocolIndex, { ELECTRON_RENDERER_URL: '' })
+  const desktop = legacyDesktopSession(join(directory, 'profile'), 9480 + protocolIndex, { ELECTRON_RENDERER_URL: '' })
   const { evaluate, wait, fill } = desktop
   async function click(text) {
     const expression = `(() => {

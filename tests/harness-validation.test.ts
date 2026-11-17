@@ -20,6 +20,9 @@ test('authoritative validation runs before approval and passes normalized defaul
     const tool = registry.definitions.find(tool => tool.name === 'write_file')!
     const schema = z.strictObject({ file_path: z.string(), content: z.string().default('Normalized') }).refine(args => args.content !== 'Invalid')
     context.mock.method(tool, 'parse', (raw: unknown) => schema.parse(raw))
+    const malformed = await registry.execute({ id: 'malformed', name: tool.name, arguments: '{ broken_json: ' })
+    assert.equal(malformed.validationError, true)
+    assert.match(malformed.output, /not valid JSON/)
     const invalid = await registry.execute({ id: 'invalid', name: tool.name, arguments: JSON.stringify({ file_path: '/notes/a.md', content: 'Invalid' }) })
     assert.equal(invalid.validationError, true)
     assert.equal(previews.length, 0)
@@ -39,8 +42,11 @@ for (const protocol of ['responses', 'chat-completions'] as const) {
       const sequence = ++requests
       const proposals = sequence === 1
         ? [{ name: 'write_file', args: { file_path: '/notes/kept.md', content: 'Kept' } }, { name: 'write_file', args: { file_path: '/notes/invalid.md' } }, { name: 'write_file', args: { file_path: '/notes/held.md', content: 'Must not run' } }]
-        : [{ name: 'write_file', args: { file_path: '/notes/invalid-again.md' } }]
-      const calls = proposals.map((tool, index) => ({ id: `${sequence}-${index}`, name: tool.name, arguments: JSON.stringify(tool.args) }))
+        : [{ name: 'write_file', args: '{ broken_json: ' }]
+      const calls = proposals.map((tool, index) => ({
+        id: `${sequence}-${index}`, name: tool.name,
+        arguments: typeof tool.args === 'string' ? tool.args : JSON.stringify(tool.args)
+      }))
       const event = protocol === 'responses'
         ? { type: 'response.completed', response: { status: 'completed', output: calls.map(call => ({ type: 'function_call', id: call.id, call_id: call.id, namespace: 'granite', name: call.name, arguments: call.arguments })) } }
         : { choices: [{ delta: { tool_calls: calls.map((call, index) => ({ index, id: call.id, function: { name: call.name, arguments: call.arguments } })) }, finish_reason: 'tool_calls' }] }
@@ -56,3 +62,24 @@ for (const protocol of ['responses', 'chat-completions'] as const) {
     } finally { await rm(root, { recursive: true, force: true }) }
   })
 }
+
+test('duplicate Chat Completions call IDs reject the whole batch before either action runs', async context => {
+  const root = await mkdtemp(join(tmpdir(), 'granite-duplicate-tool-call-'))
+  try {
+    await mkdir(join(root, 'notes'))
+    const files = ['first.md', 'second.md']
+    const calls = files.map((file, index) => ({
+      index, id: 'duplicate', function: {
+        name: 'write_file', arguments: JSON.stringify({ file_path: '/notes/' + file, content: 'Must not run' })
+      }
+    }))
+    const event = { choices: [{ delta: { tool_calls: calls }, finish_reason: 'tool_calls' }] }
+    context.mock.method(globalThis, 'fetch', async () =>
+      new Response(`data: ${JSON.stringify(event)}\n\n`, { headers: { 'Content-Type': 'text/event-stream' } }))
+
+    await assert.rejects(runHarness({ connection: { protocol: 'chat-completions', baseUrl: 'http://localhost/v1', model: 'test', apiKey: '' },
+      workspace: new AgentFilesystem(root), settings: { ...defaultHarnessSettings, skills: false }, instructions: '', history: [], text: 'Work',
+      signal: new AbortController().signal, onText() {}, onReasoning() {}, onTool() {}, approve: async () => true }), /invalid or repeated tool-call identifiers/)
+    for (const file of files) await assert.rejects(readFile(join(root, 'notes', file)), { code: 'ENOENT' })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

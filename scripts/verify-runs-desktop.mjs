@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 // A small launch/IPC/UI smoke check. Uses a disposable profile and no real model.
 const directory = await mkdtemp(join(tmpdir(), 'granite-runs-ui-'))
@@ -31,7 +31,7 @@ const server = createServer(async (request, response) => {
     response.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Working provisionally' }, finish_reason: null }] })}\n\n`)
   } else answer(response, `Finished: ${users.join(' | ')}`)
 })
-const desktop = desktopSession(directory, 9461, { ELECTRON_RENDERER_URL: '' })
+const desktop = legacyDesktopSession(directory, 9461, { ELECTRON_RENDERER_URL: '' })
 const { evaluate, click, fill, wait } = desktop
 try {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))

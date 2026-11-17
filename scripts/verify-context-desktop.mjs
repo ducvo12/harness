@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import { mkdtemp, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 const directory = await mkdtemp(join(tmpdir(), 'granite-pass4-desktop-'))
 const repository = join(directory, 'code')
@@ -49,7 +49,7 @@ const server = createServer(async (request, response) => {
   assert.ok(data.content.includes('SQLite'))
   answer('The Krypton project chose SQLite, according to your earlier message.')
 })
-const desktop=desktopSession(join(directory,'profile'),9494,{ELECTRON_RENDERER_URL:''},'.',process.env.GRANITE_TEST_APP)
+const desktop=legacyDesktopSession(join(directory,'profile'),9494,{ELECTRON_RENDERER_URL:''},'.',process.env.GRANITE_TEST_APP)
 const {evaluate,click,fill,wait}=desktop
 try {
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))

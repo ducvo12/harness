@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 const directory = await mkdtemp(join(tmpdir(), 'granite-sidebar-usage-'))
 const server = createServer(async (request, response) => {
@@ -30,7 +30,7 @@ const server = createServer(async (request, response) => {
   }
   response.end(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Usage check complete.' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`)
 })
-const desktop = desktopSession(directory, 9468, { ELECTRON_RENDERER_URL: '' })
+const desktop = legacyDesktopSession(directory, 9468, { ELECTRON_RENDERER_URL: '' })
 const { evaluate, click, fill, wait } = desktop
 
 try {

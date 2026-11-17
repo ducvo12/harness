@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { desktopSession } from './desktop/session.mjs'
 
 const directory = await mkdtemp(join(tmpdir(), 'granite-saved-chats-'))
-const original = join(directory, 'existing-profile')
-const copy = join(directory, 'workspace-profile')
+const existingProfile = join(directory, 'existing-profile')
 const executable = './node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'
 const prompts = []
 let held
@@ -57,10 +56,7 @@ const provider = createServer(async (request, response) => {
 })
 
 function workspaceSession(profile, entry) {
-  return desktopSession(profile, 9462, { ELECTRON_RENDERER_URL: '' }, entry, undefined, {
-    legacyShell: false,
-    ready: 'Boolean(document.querySelector(".workspace-app"))'
-  })
+  return desktopSession(profile, 9462, { ELECTRON_RENDERER_URL: '' }, entry)
 }
 
 async function verifyCreation(entry) {
@@ -307,7 +303,7 @@ async function verifyMarkdown({ evaluate, click, fill, wait }, root) {
 function seedProfile() {
   const code = `
     import { AgentRuntime } from './src/backend/agents/runtime.ts'
-    const runtime = await AgentRuntime.open(${JSON.stringify(original)})
+    const runtime = await AgentRuntime.open(${JSON.stringify(existingProfile)})
     try {
       const atlas = await runtime.createAgent('Archive')
       await runtime.saveMarkdown(atlas.id, '/notes/Workspace.md', '# Workspace note', null)
@@ -340,22 +336,6 @@ try {
   seedProfile()
   await new Promise(resolve => provider.listen(0, '127.0.0.1', resolve))
 
-  const legacy = desktopSession(original, 9462, { ELECTRON_RENDERER_URL: '' })
-  try {
-    await legacy.launch()
-    assert.equal(await legacy.evaluate('Boolean(document.querySelector(".app-body"))'), true)
-    const connection = await legacy.evaluate(`window.granite.connections.save({
-      name: 'Local test',
-      baseUrl: 'http://127.0.0.1:${provider.address().port}/v1',
-      model: 'saved-chat-test',
-      apiKey: ''
-    })`)
-    assert.equal(connection.ok, true)
-  } finally {
-    await legacy.quit()
-  }
-  await cp(original, copy, { recursive: true })
-  assert.equal(prompts.length, 0)
   const entry = join(directory, 'workspace.cjs')
   await writeFile(entry, `
     const { app } = require('electron')
@@ -365,7 +345,7 @@ try {
   `)
   await verifyCreation(entry)
 
-  const desktop = workspaceSession(copy, entry)
+  const desktop = workspaceSession(existingProfile, entry)
   const { evaluate, click, fill, wait, rpc } = desktop
 
   async function point(selector, x = 0.5, y = 0.5) {
@@ -440,6 +420,15 @@ try {
   const header = () => evaluate('document.querySelector(".saved-transcript-header")?.textContent')
 
   try {
+    await desktop.launch()
+    const connection = await evaluate(`window.granite.connections.save({
+      name: 'Local test',
+      baseUrl: 'http://127.0.0.1:${provider.address().port}/v1',
+      model: 'saved-chat-test',
+      apiKey: ''
+    })`)
+    assert.equal(connection.ok, true, connection.error)
+    await desktop.quit()
     await desktop.launch()
     await rpc('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] })
     await wait(() => evaluate("Boolean([...document.querySelectorAll('.agent-explorer button')].find(button => button.textContent === 'Archive'))"), 'saved agents')
@@ -704,7 +693,7 @@ try {
     await click('Start a project chat')
     const removed = await evaluate(`window.granite.conversations.delete(${JSON.stringify(agentId)}, ${JSON.stringify(savedGeneral.id)})`)
     assert.equal(removed.ok, true, removed.error)
-    await rm(join(copy, 'agents', agentId, 'notes', 'Workspace.md'))
+    await rm(join(existingProfile, 'agents', agentId, 'notes', 'Workspace.md'))
     await desktop.quit()
     await desktop.launch()
     await wait(async () => !await tabPresent(generalTab) && !await tabPresent(noteTab), 'deleted chat and file are removed on restore')
@@ -747,7 +736,7 @@ try {
   } finally {
     await desktop.quit()
   }
-  console.log('Both shells launched. The final chat pane held its fade. Explorer drafts, first sends, and reopening newly saved chats passed.')
+  console.log('The final chat pane held its fade. Explorer drafts, first sends, and reopening newly saved chats passed.')
 } finally {
   provider.closeAllConnections()
   provider.close()

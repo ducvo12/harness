@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 // Run after npm run build. All data and the simulated model stay local to this check.
 const directory = await mkdtemp(join(tmpdir(), 'granite-organization-ui-'))
@@ -27,7 +27,7 @@ const server = createServer(async (request, response) => {
   chunk({}, 'stop')
   response.end('data: [DONE]\n\n')
 })
-const desktop = desktopSession(directory, 9459, { ELECTRON_RENDERER_URL: '' })
+const desktop = legacyDesktopSession(directory, 9459, { ELECTRON_RENDERER_URL: '' })
 const { evaluate, click, fill, wait } = desktop
 
 try {

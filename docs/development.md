@@ -102,7 +102,8 @@ Deleting a chat removes its draft. A crash can lose edits since the last
 save. Markdown drafts are session-only. The desktop check covers restoration,
 draft recovery, and saving the outgoing message when the provider is unavailable.
 
-Run `node scripts/verify-saved-chats-desktop.mjs` after a build.
+Run `node scripts/verify-saved-chats-desktop.mjs` after a build. It launches
+the default workspace with fresh and seeded disposable profiles.
 
 ### Before merging to main
 
@@ -258,7 +259,17 @@ cross-cutting changes, and always rebuild with `npm run build` after code change
 Report actual results and unresolved failures; do not weaken assertions or add
 broad suppressions to establish a passing baseline.
 
-After building, useful desktop runners include:
+After building, verify the default workspace:
+
+```sh
+node scripts/verify-desktop.mjs
+node scripts/verify-saved-chats-desktop.mjs
+```
+
+The smoke check also accepts `--packaged` to launch the unpacked macOS app
+under `release/mac-arm64`.
+
+These focused desktop runners still target the legacy shell explicitly:
 
 ```sh
 node scripts/verify-organization-desktop.mjs
@@ -269,7 +280,10 @@ node scripts/verify-agents-desktop.mjs --offline
 node scripts/verify-agents-desktop.mjs
 node scripts/verify-harness-desktop.mjs
 node scripts/verify-chatgpt-models-desktop.mjs
+node scripts/verify-context-desktop.mjs
+node scripts/verify-runs-desktop.mjs
 node scripts/verify-select-position-desktop.mjs
+node scripts/verify-sidebar-usage-desktop.mjs
 ```
 
 The agent, harness, model-picker and select-position commands above use local

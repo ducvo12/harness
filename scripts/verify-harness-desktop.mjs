@@ -3,13 +3,13 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer } from 'node:http'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 const directory = await mkdtemp(join(tmpdir(), 'granite-harness-ui-'))
 
 let session
 async function launch() {
-  session = desktopSession(directory, 9443)
+  session = legacyDesktopSession(directory, 9443)
   await session.launch()
   await session.rpc('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
 }

@@ -23,6 +23,7 @@ function fixture(overrides = {}, port = 0) {
   }
   let child = makeChild()
   const children = []
+  const launchArguments = []
   let socket
   class Socket extends EventTarget {
     readyState = 0
@@ -51,9 +52,10 @@ function fixture(overrides = {}, port = 0) {
   const desktop = desktopSession('/unused', port, {}, '.', undefined, {
     timeout: 100,
     shutdownTimeout: 20,
-    spawn: () => {
+    spawn: (_executable, args) => {
       if (children.length) child = makeChild()
       children.push(child)
+      launchArguments.push(args)
       queueMicrotask(() => child.emit('spawn'))
       return child
     },
@@ -61,12 +63,13 @@ function fixture(overrides = {}, port = 0) {
     WebSocket: Socket,
     ...overrides
   })
-  return { desktop, children, get child() { return child }, get socket() { return socket } }
+  return { desktop, children, launchArguments, get child() { return child }, get socket() { return socket } }
 }
 
 test('launch, evaluate, out-of-order RPC replies, and idempotent quit', async () => {
   const f = fixture()
   await f.desktop.launch()
+  assert.ok(!f.launchArguments[0].includes('--legacy-shell'), 'desktop checks default to the workspace')
   assert.equal(await f.desktop.evaluate('true'), true)
   const first = f.desktop.rpc('First')
   const second = f.desktop.rpc('Second')
@@ -191,7 +194,7 @@ test('renderer readiness cannot hang launch', async () => {
     close() {}
   }
   const f = fixture({ WebSocket: Socket })
-  await assert.rejects(f.desktop.launch(), /Timed out: (agent registry loaded|CDP Runtime.evaluate)/)
+  await assert.rejects(f.desktop.launch(), /Timed out: (desktop shell ready|CDP Runtime.evaluate)/)
   assert.deepEqual(f.child.signals, ['SIGTERM'])
 })
 

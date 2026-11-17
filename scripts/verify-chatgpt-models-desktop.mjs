@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/pr
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 const directory = await mkdtemp(join(tmpdir(), 'granite-model-picker-'))
 const application = join(directory, 'application')
@@ -93,7 +93,7 @@ for (const file of ['index.js', 'agent-worker.js']) {
 
 let session
 async function launch() {
-  session = desktopSession(profile, 9444, {}, application)
+  session = legacyDesktopSession(profile, 9444, {}, application)
   await session.launch()
   await session.rpc('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
 }

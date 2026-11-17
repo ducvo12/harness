@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { desktopSession } from './desktop/session.mjs'
+import { legacyDesktopSession } from './desktop/session.mjs'
 
 const directory = await mkdtemp(join(tmpdir(), 'granite-select-position-'))
 const server = createServer((_request, response) => {
@@ -15,7 +15,7 @@ await new Promise((resolve, reject) => {
   server.listen(0, '127.0.0.1', resolve)
 })
 const baseUrl = `http://127.0.0.1:${server.address().port}/v1`
-const { launch, quit, rpc, evaluate, click, wait } = desktopSession(directory, 9445)
+const { launch, quit, rpc, evaluate, click, wait } = legacyDesktopSession(directory, 9445)
 const trigger = '[role="combobox"][aria-label="Active connection"]'
 
 async function openConnections() {
