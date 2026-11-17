@@ -348,6 +348,11 @@ Pass 5 concludes the 5-pass codebase cleanup, consolidating changes, eliminating
 
 ## Future optimizations
 
+### Chat attachments
+
+- Add Word (`.docx`) attachments. Extract paragraphs and table text locally,
+  preserve their reading order, and apply the existing text attachment limit.
+
 ### MD editor
 
 - Add separate Edit and Preview tabs for the same Markdown file, with a
