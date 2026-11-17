@@ -2,15 +2,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 
-export function legacyDesktopSession(directory, port, environment, entry, executable) {
-  return desktopSession(directory, port, environment, entry, executable, { legacyShell: true })
-}
-
 export function desktopSession(directory, port, environment = {}, entry = '.', executable, options = {}) {
-  const legacyShell = options.legacyShell ?? false
-  const ready = options.ready ?? (legacyShell
-    ? 'document.querySelector(".agent-dropdown-trigger")?.disabled === false'
-    : 'Boolean(document.querySelector(".workspace-app"))')
   const timeout = options.timeout ?? 20_000
   const shutdownTimeout = options.shutdownTimeout ?? 2_000
   const startProcess = options.spawn ?? spawn
@@ -134,8 +126,7 @@ export function desktopSession(directory, port, environment = {}, entry = '.', e
       }
       app = startProcess(
         executable ?? './node_modules/electron/dist/Electron.app/Contents/MacOS/Electron',
-        [...(executable ? [] : [entry]), `--remote-debugging-port=${port}`, `--user-data-dir=${directory}`,
-          ...(legacyShell ? ['--legacy-shell'] : [])],
+        [...(executable ? [] : [entry]), `--remote-debugging-port=${port}`, `--user-data-dir=${directory}`],
         {
           stdio: ['ignore', 'ignore', 'pipe'],
           env: { ...process.env, ...environment, ELECTRON_RUN_AS_NODE: '' }
@@ -200,7 +191,7 @@ export function desktopSession(directory, port, environment = {}, entry = '.', e
         if (socket.readyState === 1) resolve()
         else socket.addEventListener('open', resolve, { once: true })
       }), 'desktop WebSocket open')
-      await wait(() => evaluate(ready), 'desktop shell ready')
+      await wait(() => evaluate('Boolean(document.querySelector(".workspace-app"))'), 'workspace ready')
     } catch (error) {
       try {
         await quit()

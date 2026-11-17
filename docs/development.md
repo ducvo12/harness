@@ -39,10 +39,7 @@ fail instead of being silently ignored.
 
 ## Saved-chat workspace
 
-The workspace is Granite’s default shell. Run `npm run dev`, or run
-`npm run preview` after building. To open the legacy shell for a launch,
-use `npm run dev -- -- --legacy-shell` or `npm run preview -- -- --legacy-shell`.
-The two separators forward the flag through npm and electron-vite.
+Open the workspace with `npm run dev` or run `npm run preview` after building.
 
 ### Confirmed on rebuild
 
@@ -220,7 +217,7 @@ Open Settings → Connections to add independent ChatGPT sign-in, a Responses AP
 
 For LM Studio on another device, use that device's reachable server address (for example `http://192.168.1.50:1234/v1`); localhost refers to Granite's machine. The network/firewall must permit access. API keys use Electron safeStorage and are not sent back to the renderer; Linux plaintext fallback is rejected. Endpoint changes with saved keys require explicit key handling. Account sign-in belongs to Granite, not Codex.
 
-There are **no whole-run time/step/tool-count caps** and no fixed terminal deadline. `src/backend/context/` owns scoped source indexing, provenance, file reconciliation, request token budgets and revision-aware cache reuse. The loop counts schemas and compacts older valid history before the configured model window fills. Output reserves and fallback limits are configurable in Tools & skills. Full transcripts remain saved. See [the harness guide](harness.md) and [Pass 4 verification](<vault/Verification/Pass 4 Implementation & Testing.md>).
+There are **no whole-run time/step/tool-count caps** and no fixed terminal deadline. `src/backend/context/` owns scoped source indexing, provenance, file reconciliation, request token budgets and revision-aware cache reuse. The loop counts schemas and compacts older valid history before the configured model window fills. Full transcripts remain saved. See [the harness guide](harness.md) and [Pass 4 verification](<vault/Verification/Pass 4 Implementation & Testing.md>).
 
 Repository commands, interactive sessions and previews currently require macOS confinement. Ordinary sessions/cache end with the run; only a verified ready managed preview may remain afterward without occupying model/project capacity. Previews use isolated snapshots, require refresh for newer code and stop on owning Stop/deletion/app closure. Commands support safe contained relative installer links, bounded download authorization and guarded publication. Full details: [harness guide](harness.md).
 
@@ -269,31 +266,7 @@ node scripts/verify-saved-chats-desktop.mjs
 The smoke check also accepts `--packaged` to launch the unpacked macOS app
 under `release/mac-arm64`.
 
-These focused desktop runners still target the legacy shell explicitly:
-
-```sh
-node scripts/verify-organization-desktop.mjs
-node scripts/verify-pass2-selected-desktop.mjs
-node scripts/verify-repositories-desktop.mjs
-node scripts/verify-repositories-desktop.mjs --packaged --executable "/path/Granite.app/Contents/MacOS/Granite"
-node scripts/verify-agents-desktop.mjs --offline
-node scripts/verify-agents-desktop.mjs
-node scripts/verify-harness-desktop.mjs
-node scripts/verify-chatgpt-models-desktop.mjs
-node scripts/verify-context-desktop.mjs
-node scripts/verify-runs-desktop.mjs
-node scripts/verify-select-position-desktop.mjs
-node scripts/verify-sidebar-usage-desktop.mjs
-```
-
-The agent, harness, model-picker and select-position commands above use local
-fixtures unless an explicit live option is requested. The model-picker runner
-instruments a disposable copy of the compiled app with a synthetic account; it
-does not sign in to a real account. Used chats retain their bound connection and
-model; selecting another model requires a new chat.
-
-Repository `--packaged` checks require the actual executable path; the flag alone
-is an error. The shared desktop session rejects occupied debugging ports and
+The shared desktop session rejects occupied debugging ports and
 bounds startup, CDP requests and shutdown. These verification deadlines do not
 limit agent runs or repository commands. Desktop checks launch the existing
 compiled output: run a fresh build first, and do not treat a source-revision note
@@ -301,8 +274,7 @@ from an old runner as proof of compiled-artifact provenance.
 
 ### Backend cleanup verification — cleanup Pass 3
 
-The formerly failing live-PTY prompt assertion now passes in
-`verify-repositories-desktop.mjs`, along with publication, question, preview,
+The repository runner passed the live-PTY prompt assertion, along with publication, question, preview,
 project-queue and worker-crash recovery scenarios. The offline agent runner also
 checks restart restoration, committed deletion cleanup, preserved recovery
 conflicts and unaffected-agent access through the actual worker/IPC bridge.
@@ -313,7 +285,7 @@ model picker, select positioning, multi-chat runs and repositories. These are
 development-build/mock-provider results, not live-provider or packaged acceptance.
 Existing module-type and ineffective-dynamic-import warnings remain visible.
 
-Additional focused runners cover harness settings/approvals, questions, model catalogs and sidebar usage. Inspect each script's current coverage before using an old result to accept new behavior. In particular, an old model-picker check is not evidence of permitted mid-session switching.
+These results describe the desktop runners from Pass 3. See the workspace commands above for the current desktop checks.
 
 Real framework acceptance uses actual downloads in disposable repositories:
 

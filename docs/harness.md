@@ -24,15 +24,15 @@ Each run loads the selected agent’s profile/personality and user instructions;
 
 Memory and notes remain editable files. Pass 4 added scoped SQLite FTS5 retrieval over saved messages, titles, notes and chat-owned summaries through `list_context`, `search_context` and `read_context`. Shared chats can retrieve eligible same-agent Shared content; Closed chats can run with their section's context and notes, without global user memory. Repository reads retain their separate membership rules. Pass 5 delivered temporary execution, countdown timers, and Keep promotion.
 
-Use `update_memory` for revision-guarded, source-backed user facts and `save_note` for knowledge notes. Generic `edit_file` no longer edits memory. Generated memory/notes retain original source support; deletion prunes support and invalidates unsupported derived content without rewriting surviving chats. Manual replacements remain authoritative. `update_chat_summary` stages continuity until successful completion, without a separate extraction call after every greeting. `propose_identity_change` shows the exact replacement for approval and activates it next run. A compact Sources disclosure groups saved context by chat/file and opens original text and memory support. Current user prompts are omitted from that list; Chat details → Context retrieval retains the unfiltered recorded references.
+Use `update_memory` for revision-guarded, source-backed user facts and `save_note` for knowledge notes. Generic `edit_file` no longer edits memory. Generated memory/notes retain original source support; deletion prunes support and invalidates unsupported derived content without rewriting surviving chats. Manual replacements remain authoritative. `update_chat_summary` stages continuity until successful completion, without a separate extraction call after every greeting. `propose_identity_change` shows the exact replacement for approval and activates it next run.
 
 Native Responses items, including opaque encrypted reasoning, are retained in SQLite’s `harness_state` table. They are replayed in order on subsequent requests to the same model/provider/account. They are not exposed through the renderer conversation bridge. Display messages remain separate from provider state. Recovering an interrupted run rebuilds compatible context from visible messages and recorded tool outcomes; it does not authorize provider switching within an existing chat. Unfinished tool calls are never automatically replayed.
 
 ## Tools and approvals
 
-Open **Tools & skills** in the sidebar for the selected agent.
+Granite loads per-agent tool settings from `harness.json`. The workspace Settings dialog manages model connections.
 
-Workspace tools list/read/write/edit files, find filenames, search contents, and record task lists. The virtual root is the agent’s folder. Parent traversal and symbolic-link access are rejected. Identity, agent configuration, harness settings, and skill instructions cannot be modified through file tools. Enable **Ask before each workspace file change** to require approval for writes and edits.
+Workspace tools list/read/write/edit files, find filenames, search contents, and record task lists. The virtual root is the agent’s folder. Parent traversal and symbolic-link access are rejected. Identity, agent configuration, harness settings, and skill instructions cannot be modified through file tools. The per-agent `approveWrites` setting requires approval for workspace writes and edits.
 
 Approvals are scoped to one pending action and one active request. **Allow once** resumes that action; **Deny** returns a tool error to the model. **Stop agent** cancels the run and invalidates pending approvals. A permission is enforced in backend code, independently of the model’s instructions. Tool inputs, results, and status appear in the conversation. Completed changes remain after Stop.
 
@@ -44,7 +44,7 @@ Runs serialize within a repository project, including text-only questions, while
 
 ### Skills
 
-Create or edit skills in **Tools & skills**. Granite stores each skill at `skills/<name>/SKILL.md` inside the agent’s folder. A run exposes a bounded catalog and a `load_skill` tool so the model can retrieve relevant instructions. A skill does not grant permissions or execute scripts by itself. Skills are read-only to model tools and terminal commands; the user manages them through the application. Disable the skill catalog and loader per agent when desired. Ordinary workspace reads still follow the workspace file policy.
+Granite stores each skill at `skills/<name>/SKILL.md` inside the agent’s folder. A run exposes a bounded catalog and a `load_skill` tool so the model can retrieve relevant instructions. A skill does not grant permissions or execute scripts by itself. Skills are read-only to model tools and terminal commands. Ordinary workspace reads still follow the workspace file policy.
 
 ### MCP
 
@@ -76,7 +76,7 @@ Links in replies and rendered Markdown open in the system browser when clicked. 
 
 ## Limits and recovery
 
-Granite has no whole-run deadline, model-step limit or tool-count cap. Each request counts instructions, native items and tool schemas against the provider-advertised or configured context window. Unknown limits use a labeled 32,768-token fallback; Tools & skills offers overrides. Compatible models use the maintained o200k tokenizer; other models use a labeled UTF-8 estimate. At least 25% is reserved for output/tools. Near 80% of the remaining input budget, Granite drops optional context and compacts older complete tool-call/result spans, targeting roughly 60%. Required context that cannot fit produces an error rather than dropping the task.
+Granite has no whole-run deadline, model-step limit or tool-count cap. Each request counts instructions, native items and tool schemas against the provider-advertised or configured context window. Unknown limits use a labeled 32,768-token fallback. Compatible models use the maintained o200k tokenizer; other models use a labeled UTF-8 estimate. At least 25% is reserved for output/tools. Near 80% of the remaining input budget, Granite drops optional context and compacts older complete tool-call/result spans, targeting roughly 60%. Required context that cannot fit produces an error rather than dropping the task.
 
 Compaction is internal, cancellable and preserves full saved transcripts plus current run directions. Source deletion/revision changes invalidate retrieved native state and derived compaction data before reuse. Stop or steering during maintenance discards obsolete results. Completed actions remain. Only pre-response transient model failures are retried; tools are never replayed automatically.
 
@@ -91,7 +91,7 @@ ChatGPT sign-in validates OAuth state, PKCE, the ID-token signature, issuer, aud
 - `src/backend/harness/`: Granite’s loop, permissions/approvals, per-agent settings, provider adapters, file/skill/MCP/terminal tools.
 - `src/backend/auth/`: independent ChatGPT authorization and protected account storage.
 - `src/backend/agents/`: agent lifecycle, worker bridge, SQLite display/native state, and legacy storage migration.
-- `src/renderer/src/features/harness/`: per-agent controls and the approval dialog.
+- `src/renderer/src/features/harness/`: the live approval prompt.
 
 The filesystem backend remains a library utility; no external agent framework runs the tool loop. The historical SQLite checkpoint library remains for migration and cleanup. Electron main and the agent worker are built independently so shared bundler helpers cannot cause main to execute the worker entry point.
 
@@ -99,17 +99,6 @@ Run `npm test` for model-loop, OAuth, permissions, terminal-boundary, MCP subpro
 
 After `npm run build`, run `node scripts/verify-desktop.mjs` for a default
 workspace smoke check and `node scripts/verify-saved-chats-desktop.mjs` for
-workspace workflows. These focused macOS checks exercise the legacy shell
-with isolated temporary profiles:
-
-```sh
-node scripts/verify-harness-desktop.mjs
-node scripts/verify-chatgpt-models-desktop.mjs
-node scripts/verify-agents-desktop.mjs --offline
-```
-
-The harness check exercises the actual settings editor, skill saving, Responses connection, approval denial and allowance, Stop while waiting for approval, and restart persistence. It uses a mock model and consumes no account usage.
-
-The ChatGPT model-picker check instruments a disposable build and profile with mock account credentials and a local catalog/inference server. It verifies saving one account connection without a fixed model, model-selection controls and persistence, refreshing changed catalogs, retrying failed discovery, and rejecting unavailable models before inference. It consumes no real account usage.
-
-That model-picker runner originated before fixed session binding; its historical switching cases do not override the current used-chat binding rule. Consult its current assertions before using it for acceptance. Broader unverified cases remain in [Tests to Run Later](<vault/Tests to Run Later.md>).
+workspace workflows. Both checks use disposable profiles. The saved-chat check
+uses a local simulated model provider. Broader unverified cases remain in
+[Tests to Run Later](<vault/Tests to Run Later.md>).

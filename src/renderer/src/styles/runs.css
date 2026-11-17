@@ -3,13 +3,6 @@
 .run-status-prompt > span { line-height: 1.6; }
 .run-status-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .run-status-actions button { font-size: 12px; }
-.message-delivery { display: block; color: var(--text-muted); font-size: 11px; margin: 3px 0 8px; }
-.chat-run-badge { flex: 0 0 auto; color: var(--text-muted); font-size: 10px; margin-left: 5px; }
-.recovery-dialog { width: min(480px, calc(100vw - 40px)); padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 60px #0008; }
-.recovery-dialog h2 { font-size: 17px; }
-.recovery-dialog p { color: var(--text-secondary); font-size: 13px; line-height: 1.6; margin: 14px 0; }
-.recovery-dialog > button { float: right; }
-.modal-backdrop { position: fixed; inset: 0; display: grid; place-items: center; background: #0008; z-index: 1000; }
 .approval-panel { margin-bottom: 10px; }
 .approval-panel .approval-dialog { width: 100%; max-height: 32vh; overflow: auto; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 20px #00000030; }
 .approval-panel .approval-dialog pre { max-height: 13vh; }
@@ -19,16 +12,6 @@
 .question-panel legend { padding: 0; margin-bottom: 10px; font-weight: 500; }
 .question-panel label { display: grid; gap: 6px; font-size: 13px; }
 .question-panel input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; color: inherit; background: transparent; }
-.question-options, .question-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-.question-options button, .question-actions button { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
-.question-options button[aria-pressed=true] { outline: 2px solid currentColor; }
+.question-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.question-actions button { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
 .question-actions { justify-content: flex-end; margin: 0; }
-
-.project-activity { margin-bottom: 10px; max-height: 30vh; overflow: auto; font-size: 13px; }
-.project-activity details { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin: 6px 0; background: var(--surface); }
-.project-activity summary { cursor: pointer; }
-.project-activity p { color: var(--muted); line-height: 1.5; }
-.project-activity pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 140px; overflow: auto; }
-.preview-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.project-activity button { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; margin-left: 6px; }
-.question-history { color: var(--muted); font-size: 14px; }

@@ -27,10 +27,6 @@ export class AccountModelCatalog {
     return entry.promise.then(models => structuredClone(models))
   }
 
-  warm(accountIds: string[]) {
-    return Promise.allSettled([...new Set(accountIds)].map(id => this.get(id)))
-  }
-
   invalidate(accountId: string) { this.entries.delete(accountId) }
 
   async refreshAfterError(connection: Connection, result: Result<unknown>) {

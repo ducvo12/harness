@@ -17,7 +17,7 @@ import { ConnectionUsageStore, type UsageBinding } from '../backend/connections/
 import { convertAttachment } from './attachment-conversion'
 import { messageTextLimit } from '../shared/chat-limits'
 
-export function registerIpc(directory: string, legacyShell: boolean) {
+export function registerIpc(directory: string) {
   const ipcMain = {
     handle<Key extends keyof IpcCalls>(channel: Key, listener: (event: Electron.IpcMainInvokeEvent, ...args: Parameters<IpcCalls[Key]>) => Promise<Awaited<ReturnType<IpcCalls[Key]>>> | Awaited<ReturnType<IpcCalls[Key]>>) {
       main.handle(channel, listener)
@@ -35,12 +35,6 @@ export function registerIpc(directory: string, legacyShell: boolean) {
   const modelCatalog = new AccountModelCatalog(chatgpt)
   const apiMetadata = new Map<string, import('../shared/chat').ModelOption[]>()
   const repositoryEditors = new RepositoryEditors(directory)
-  // Legacy model pickers share a catalog warmed at startup. The workspace loads it on demand.
-  if (legacyShell) {
-    void store.list().then(connections => modelCatalog.warm(connections
-      .filter(connection => connection.provider === 'chatgpt' && connection.accountId)
-      .map(connection => connection.accountId!))).catch(() => {})
-  }
   app.on('before-quit', () => chatgpt.cancel())
   const usage = new ConnectionUsageStore()
   const publishUsage = () => {

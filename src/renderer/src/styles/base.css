@@ -61,8 +61,7 @@ select:focus-visible {
   border-color: var(--border);
 }
 
-.quiet-button:hover:not(:disabled),
-.icon-button:hover:not(:disabled) {
+.quiet-button:hover:not(:disabled) {
   background: var(--surface-selected);
 }
 
@@ -99,13 +98,6 @@ header {
   border-radius: var(--radius-sharp);
   padding: 5px 8px;
   color: var(--text-secondary);
-}
-
-.eyebrow {
-  font-family: var(--font-mono);
-  color: var(--accent);
-  font-size: 10px;
-  letter-spacing: 2px;
 }
 
 h1 {
@@ -170,14 +162,6 @@ textarea:focus-visible {
   padding: 12px 14px;
   border-radius: 7px;
   margin-bottom: 15px;
-}
-
-.icon-button {
-  color: var(--text-muted);
-  background: transparent;
-  border-color: transparent;
-  padding: 7px;
-  font-size: 20px;
 }
 
 .danger-button {

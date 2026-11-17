@@ -1,9 +1,3 @@
-.chat-workspace { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
-.chat-workspace-body { display: flex; flex: 1; min-width: 0; min-height: 0; position: relative; }
-.chat-workspace-body > .chat-main { flex: 1; min-width: 0; }
-.activity-toggle { display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 5px; border: 0; font-size: 10px; }
-.chat-activity-panel { align-self: flex-start; flex: 0 0 280px; min-width: 0; max-height: calc(100% - 16px); margin: 8px 8px 8px 0; padding: 6px 14px; background: var(--surface-sidebar); border: 1px solid var(--surface-selected); border-radius: 10px; overflow: auto; }
-.activity-panel-body { min-height: 0; }
 .activity-section { padding: 6px 0; }
 .activity-section-heading { display: flex; align-items: center; gap: 10px; min-height: 24px; }
 .activity-section-heading h3 { flex: 1; min-width: 0; margin: 0; font-size: 12px; font-weight: 400; }
@@ -29,12 +23,3 @@
 .activity-command { display: block; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
 .activity-item pre { font-size: 10px; line-height: 1.6; white-space: pre; overflow: auto; max-height: 220px; padding: 8px; background: var(--surface-inset); border: 1px solid var(--surface-selected); border-radius: 6px; }
 .activity-item button { font-size: 10px; padding: 4px 6px; }
-.chat-activity-panel .preview-actions { gap: 6px; }
-@media (max-width: 1050px) {
-  .chat-workspace .chat-heading-status { display: none; }
-  .chat-workspace .composer-area { padding-left: 20px; padding-right: 20px; }
-  .chat-workspace .composer-actions { flex-wrap: wrap; justify-content: flex-end; }
-}
-@media (max-width: 850px) {
-  .chat-activity-panel { position: absolute; right: 0; top: 0; width: min(280px, 90%); z-index: 30; box-shadow: 0 6px 24px #0003; }
-}

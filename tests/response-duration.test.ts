@@ -4,38 +4,6 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AgentStore } from '../src/backend/agents/store.ts'
-import { ResponseClock } from '../src/renderer/src/features/chat/response-clock.ts'
-
-test('response clock measures send to final render independently of dev timing and network completion', () => {
-  let now = 100
-  const clock = new ResponseClock(() => now)
-  const persisted: unknown[] = []
-  clock.begin('request')
-  now = 200
-  clock.rendered('request', 'Hello')
-  clock.bind('request', 'saved-id', 'Hello world', (...args) => persisted.push(args))
-  assert.equal(persisted.length, 0, 'backend completion must not stop the display timer')
-  now = 450
-  clock.rendered('saved-id', 'Hello world')
-  assert.deepEqual(persisted, [['saved-id', 350]])
-  now = 900
-  clock.rendered('saved-id', 'Hello world')
-  assert.equal(clock.elapsed('request'), 350)
-  assert.equal(persisted.length, 1)
-  assert.equal(clock.get('saved-id')?.requestId, 'request')
-})
-
-test('a final chunk painted before the backend result keeps its actual render time', () => {
-  let now = 0
-  const clock = new ResponseClock(() => now)
-  clock.begin('request')
-  now = 120
-  clock.rendered('request', 'Complete')
-  now = 500
-  let duration = -1
-  clock.bind('request', 'saved-id', 'Complete', (_id, ms) => { duration = ms })
-  assert.equal(duration, 120)
-})
 
 test('response duration persists in SQLite, preserves message content and ordering, and cannot be overwritten', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'granite-response-duration-'))

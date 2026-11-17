@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from 'react'
+import { useRef } from 'react'
 import type { Agent, AgentMessage } from '../../../../shared/agent'
 import type { SavedConnection } from '../../../../shared/chat'
 import type { RunSnapshot } from '../../../../shared/run'
@@ -23,11 +23,8 @@ interface ChatComposerProps {
   loaded: boolean
   submitting: boolean
   stopping: boolean
-  identityDirty?: boolean
-  canSendWithoutModel?: boolean
   run?: RunSnapshot
   progress: string
-  messageInput?: RefObject<HTMLTextAreaElement | null>
   onSelectConnection: (id: string) => void
   onOpenSettings: () => void
   onDraftChange: (draft: string) => void
@@ -37,7 +34,7 @@ interface ChatComposerProps {
 
 export default function ChatComposer({
   agent, connections, connection, modelSelection, messages, draft, attachments, attachmentPicker,
-  busy, loaded, submitting, stopping, identityDirty, canSendWithoutModel, run, progress, messageInput,
+  busy, loaded, submitting, stopping, run, progress,
   onSelectConnection, onOpenSettings, onDraftChange, onAttachmentsChange, onSend, onStop
 }: ChatComposerProps) {
   const contextResponse = latestContextResponse(messages, modelSelection.model)
@@ -78,15 +75,10 @@ export default function ChatComposer({
       )}
 
       <textarea
-        ref={messageInput}
         aria-label="Message"
         value={draft}
-        disabled={submitting || (!connection && !canSendWithoutModel) || !agent || !loaded}
-        placeholder={
-          connection || canSendWithoutModel
-            ? `Message ${agent?.name ?? 'your agent'}…`
-            : 'Add a connection in Settings to begin'
-        }
+        disabled={submitting || !agent || !loaded}
+        placeholder={`Message ${agent?.name ?? 'your agent'}…`}
         rows={2}
         onChange={event => onDraftChange(event.target.value)}
         onPaste={event => {
@@ -158,7 +150,7 @@ export default function ChatComposer({
             <button
               type="button"
               className="model-connect quiet-button"
-              disabled={busy || !loaded || identityDirty}
+              disabled={busy || !loaded}
               onClick={onOpenSettings}
             >
               Connect model
@@ -181,7 +173,7 @@ export default function ChatComposer({
               className="send-button"
               aria-label={busy ? 'Send update' : 'Send message'}
               title={busy ? 'Send a message to steer this run' : 'Send message'}
-              disabled={attachmentDisabled || (!draft.trim() && !attachments.length) || (!modelSelection.ready && !canSendWithoutModel)}
+              disabled={attachmentDisabled || (!draft.trim() && !attachments.length)}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 19V5m-6 6 6-6 6 6" />

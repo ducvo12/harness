@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, shell } from 'electron'
 import { join } from 'node:path'
 import { externalWebUrl } from './web-links'
 
-export function createWindow(legacyShell: boolean): void {
+export function createWindow(): void {
   const window = new BrowserWindow({
     width: 1120,
     height: 760,
@@ -36,10 +36,8 @@ export function createWindow(legacyShell: boolean): void {
   window.webContents.on('will-navigate', event => event.preventDefault())
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    const url = new URL(process.env.ELECTRON_RENDERER_URL)
-    url.hash = legacyShell ? 'legacy-shell' : ''
-    void window.loadURL(url.href)
+    void window.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'), legacyShell ? { hash: 'legacy-shell' } : undefined)
+    void window.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }

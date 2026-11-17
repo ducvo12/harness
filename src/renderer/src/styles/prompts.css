@@ -23,9 +23,8 @@
 .approval-panel .approval-dialog .prompt-title { margin: 0 0 10px; font-size: 13px; font-weight: 400; }
 .approval-panel .approval-dialog > .prompt-key-hint { color: var(--text-muted); font-size: 10px; }
 .approval-panel .approval-dialog pre { max-height: 18vh; color: var(--text-muted); }
-.project-entry-prompt button, .run-status-actions button { background: var(--surface-raised); color: var(--text-secondary); border-color: var(--border); }
-.project-entry-prompt button:hover:not(:disabled), .run-status-actions button:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-secondary); }
-.project-entry-prompt > .prompt-choices { width: 100%; }
+.run-status-actions button { background: var(--surface-raised); color: var(--text-secondary); border-color: var(--border); }
+.run-status-actions button:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-secondary); }
 .run-status-actions { flex: 1 0 100%; }
 .run-status-actions > .prompt-choices { width: 100%; }
 .prompt-custom-choice.prompt-text-only > label { grid-template-columns: minmax(0, 1fr); }

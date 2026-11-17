@@ -185,7 +185,7 @@ export default function WorkspaceChat({
           <ChatComposer agent={agent} connections={savedConnections} connection={connection} modelSelection={modelSelection}
             messages={messages} draft={draft.text} attachments={draft.attachments} attachmentPicker={attachmentPicker} onAttachmentsChange={changeAttachments}
             busy={busy} loaded={loaded} submitting={submitting}
-            canSendWithoutModel stopping={run?.phase === 'stopping'} run={run} progress={run ? runLabel(run) : ''}
+            stopping={run?.phase === 'stopping'} run={run} progress={run ? runLabel(run) : ''}
             onSelectConnection={onSelectConnection} onOpenSettings={onOpenSettings}
             onDraftChange={text => onDraftChange({ text })} onSend={() => send('message')} onStop={stop} />
         </div>
