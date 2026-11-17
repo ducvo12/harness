@@ -119,6 +119,11 @@
   color: var(--text);
 }
 
+.workspace-connections::backdrop {
+  background: color-mix(in srgb, var(--overlay) 75%, transparent);
+  backdrop-filter: blur(2px);
+}
+
 .workspace-creation {
   max-width: calc(100% - 2rem);
   border-radius: var(--radius-lg);

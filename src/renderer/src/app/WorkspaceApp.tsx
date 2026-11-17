@@ -381,7 +381,7 @@ export default function WorkspaceApp() {
         focusedChat.current = id
       }
     }}>
-      <Header />
+      <Header onOpenSettings={() => setSettingsOpen(true)} />
 
       {windowError && <p role="alert">{windowError}</p>}
 
@@ -404,13 +404,29 @@ export default function WorkspaceApp() {
           onClose={() => setCreation(undefined)} />
       )}
 
-      {settingsOpen && connections?.ok && (
+      {settingsOpen && (
         <dialog className="workspace-connections" aria-label="Connections" ref={settings} onClose={() => setSettingsOpen(false)}>
           <button type="button" className="quiet-button" onClick={() => settings.current?.close()}>
             Close settings
           </button>
 
-          <Settings connections={connections.value} onChange={setEditedConnections} />
+          {connections?.ok ? (
+            <Settings connections={connections.value} onChange={setEditedConnections} />
+          ) : connections ? (
+            <div>
+              <p role="alert">
+                {connections.error}
+              </p>
+
+              <button type="button" onClick={() => retryConnections()}>
+                Retry
+              </button>
+            </div>
+          ) : (
+            <p>
+              Loading connections…
+            </p>
+          )}
         </dialog>
       )}
     </div>

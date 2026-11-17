@@ -2,15 +2,20 @@
   .app-header {
     height: 34px;
     justify-content: flex-start;
-    padding: 0 16px;
+    padding: 0 6px 0 16px;
     background: transparent;
     border-bottom: none;
     -webkit-app-region: drag;
   }
 
+  .app-header button {
+    -webkit-app-region: no-drag;
+  }
+
   .app-header-mac {
     /* Leave room for the native window controls. */
     padding-left: 92px;
+    padding-right: 6px;
   }
 
   .app-brand {
@@ -22,6 +27,35 @@
     font-size: 13px;
     font-weight: 600;
     letter-spacing: -0.2px;
+  }
+
+  .header-settings-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin-left: auto;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    border-top-right-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+      background var(--duration-fast) var(--ease-soft),
+      color var(--duration-fast) var(--ease-soft);
+  }
+
+  .header-settings-button:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--text-strong);
+  }
+
+  .header-settings-button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
   }
 
   .workspace {
