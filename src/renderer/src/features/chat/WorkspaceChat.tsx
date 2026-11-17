@@ -1,3 +1,4 @@
+import { useId, useRef, useState } from 'react'
 import type { Agent, AgentMessage } from '../../../../shared/agent'
 import type { Result, SavedConnection } from '../../../../shared/chat'
 import { isLiveRun, type RunIntent } from '../../../../shared/run'
@@ -6,6 +7,7 @@ import ApprovalPrompt from '../harness/ApprovalPrompt'
 import AttachedFiles from './AttachedFiles'
 import ChatComposer from './ChatComposer'
 import QuestionPrompt from './QuestionPrompt'
+import RepositoryActivity from './RepositoryActivity'
 import RunControls, { runLabel } from './RunControls'
 import SavedTranscript, { type ReadingPosition } from './SavedTranscript'
 import { messageWithAttachments, type ChatAttachment } from './attachments'
@@ -53,6 +55,9 @@ export default function WorkspaceChat({
   const modelSelection = useConnectionModel(connection, model, conversationId, effort)
   const loaded = !conversationId || result?.ok === true
   const transcript = result?.ok ? { ok: true as const, value: { ...result.value, messages } } : result
+  const [activityOpen, setActivityOpen] = useState(false)
+  const activityId = useId()
+  const activityToggle = useRef<HTMLButtonElement>(null)
 
   async function send(intent: RunIntent) {
     if (!agent || !loaded || submitting) return
@@ -94,70 +99,92 @@ export default function WorkspaceChat({
   const question = run?.question
   return (
     <div className="workspace-chat" data-chat-draft-id={draftId}>
-      <SavedTranscript draft={!conversationId} result={transcript} path={path} retry={onReload} readPosition={readPosition} savePosition={savePosition} />
+      <div className="workspace-chat-layout">
+        <SavedTranscript draft={!conversationId} result={transcript} path={path} retry={onReload} readPosition={readPosition} savePosition={savePosition} />
 
-      <div className="composer-area">
-        {!busy && (
-          <RunControls run={run} messages={messages} disabled={!modelSelection.ready || !loaded || submitting}
-            onContinue={() => send('continue')} onRunPending={() => send('pending')} onCancelPending={async () => {
-              if (agent && conversationId && await request(() => window.granite.runs.cancelPending(agent.id, conversationId))) onReload()
+        {agent && conversationId && loaded && (
+          <div className="workspace-chat-activity" onKeyDown={event => {
+            if (event.key === 'Escape' && activityOpen && activityToggle.current?.getClientRects().length) {
+              event.stopPropagation()
+              setActivityOpen(false)
+              activityToggle.current.focus()
+            }
+          }}>
+            <button ref={activityToggle} type="button" className="workspace-activity-toggle quiet-button"
+              aria-expanded={activityOpen} aria-controls={activityId} onClick={() => setActivityOpen(open => !open)}>
+              Activity
+            </button>
+
+            <aside id={activityId} className="workspace-activity-panel" aria-label="Chat activity">
+              <RepositoryActivity key={JSON.stringify([agent.id, conversationId])} agentId={agent.id}
+                conversationId={conversationId} busy={busy} stopping={run?.phase === 'stopping'} run={run} onStop={stop} />
+            </aside>
+          </div>
+        )}
+
+        <div className="composer-area">
+          {!busy && (
+            <RunControls run={run} messages={messages} disabled={!modelSelection.ready || !loaded || submitting}
+              onContinue={() => send('continue')} onRunPending={() => send('pending')} onCancelPending={async () => {
+                if (agent && conversationId && await request(() => window.granite.runs.cancelPending(agent.id, conversationId))) onReload()
+              }} />
+          )}
+
+          {run && question && (
+            <QuestionPrompt key={question.id} question={question} autoFocus={false}
+              onAnswer={answers => request(() => window.granite.harness.answer(run.id, question.id, answers))}
+              onReject={() => request(() => window.granite.harness.rejectQuestion(run.id, question.id))} />
+          )}
+
+          {approval && (
+            <ApprovalPrompt key={approval.id} request={approval} autoFocus={false} onAnswer={async allow => {
+              await request(() => window.granite.harness.approve(approval.requestId, approval.id, allow))
             }} />
-        )}
+          )}
 
-        {run && question && (
-          <QuestionPrompt key={question.id} question={question} autoFocus={false}
-            onAnswer={answers => request(() => window.granite.harness.answer(run.id, question.id, answers))}
-            onReject={() => request(() => window.granite.harness.rejectQuestion(run.id, question.id))} />
-        )}
+          {connections && !connections.ok && (
+            <div className="error" role="alert">
+              {connections.error}
 
-        {approval && (
-          <ApprovalPrompt key={approval.id} request={approval} autoFocus={false} onAnswer={async allow => {
-            await request(() => window.granite.harness.approve(approval.requestId, approval.id, allow))
-          }} />
-        )}
-
-        {connections && !connections.ok && (
-          <div className="error" role="alert">
-            {connections.error}
-
-            <button type="button" onClick={onRetryConnections}>
-              Retry
-            </button>
-          </div>
-        )}
-
-        {loaded && model && !connection && (
-          <div className="error" role="alert">
-            Restore this chat’s saved connection to get a reply.
-
-            {savedConnections.length > 0 && (
-              <button type="button" onClick={onOpenSettings}>
-                Manage connections
+              <button type="button" onClick={onRetryConnections}>
+                Retry
               </button>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {modelSelection.error && <p className="error" role="alert">{modelSelection.error}</p>}
+          {loaded && model && !connection && (
+            <div className="error" role="alert">
+              Restore this chat’s saved connection to get a reply.
 
-        {chat?.error && (
-          <div className="error" role="alert">
-            {chat.error}
+              {savedConnections.length > 0 && (
+                <button type="button" onClick={onOpenSettings}>
+                  Manage connections
+                </button>
+              )}
+            </div>
+          )}
 
-            <button type="button" className="dismiss" aria-label="Dismiss error" onClick={() => onError('')}>
-              ×
-            </button>
-          </div>
-        )}
+          {modelSelection.error && <p className="error" role="alert">{modelSelection.error}</p>}
 
-        <AttachedFiles attachments={draft.attachments} messages={messages} disabled={!loaded || submitting}
-          onChange={attachments => onDraftChange({ attachments })} />
+          {chat?.error && (
+            <div className="error" role="alert">
+              {chat.error}
 
-        <ChatComposer agent={agent} connections={savedConnections} connection={connection} modelSelection={modelSelection}
-          messages={messages} draft={draft.text} attachments={draft.attachments} busy={busy} loaded={loaded} submitting={submitting}
-          canSendWithoutModel stopping={run?.phase === 'stopping'} run={run} progress={run ? runLabel(run) : ''}
-          onSelectConnection={onSelectConnection} onOpenSettings={onOpenSettings}
-          onDraftChange={text => onDraftChange({ text })} onSend={() => send('message')} onStop={stop} />
+              <button type="button" className="dismiss" aria-label="Dismiss error" onClick={() => onError('')}>
+                ×
+              </button>
+            </div>
+          )}
+
+          <AttachedFiles attachments={draft.attachments} messages={messages} disabled={!loaded || submitting}
+            onChange={attachments => onDraftChange({ attachments })} />
+
+          <ChatComposer agent={agent} connections={savedConnections} connection={connection} modelSelection={modelSelection}
+            messages={messages} draft={draft.text} attachments={draft.attachments} busy={busy} loaded={loaded} submitting={submitting}
+            canSendWithoutModel stopping={run?.phase === 'stopping'} run={run} progress={run ? runLabel(run) : ''}
+            onSelectConnection={onSelectConnection} onOpenSettings={onOpenSettings}
+            onDraftChange={text => onDraftChange({ text })} onSend={() => send('message')} onStop={stop} />
+        </div>
       </div>
     </div>
   )
