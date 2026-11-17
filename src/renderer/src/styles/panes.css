@@ -174,13 +174,35 @@
   position: relative;
 }
 
-.pane-slot-dragging::before,
 .region-slot-dragging::before {
   content: '';
   position: absolute;
   inset: 0;
-  border: 1px dashed var(--focus);
+  border: 1.5px dashed var(--focus);
   border-radius: var(--radius-lg);
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-soft);
+}
+
+.pane-layout.is-separating:has(.pane-split)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1.5px dashed var(--focus);
+  border-radius: var(--radius-lg);
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-soft);
+}
+
+.pane-slot-dragging::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle);
   opacity: 1;
   pointer-events: none;
   transition: opacity var(--duration-fast) var(--ease-soft);
@@ -188,7 +210,8 @@
 
 @starting-style {
   .pane-slot-dragging::before,
-  .region-slot-dragging::before {
+  .region-slot-dragging::before,
+  .pane-layout.is-separating:has(.pane-split)::before {
     opacity: 0;
   }
 }
