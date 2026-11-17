@@ -11,7 +11,7 @@ export function createWindow(legacyShell: boolean): void {
     title: app.isPackaged ? 'Archon' : 'Archon (Development)',
     ...(process.platform === 'darwin' && {
       titleBarStyle: 'hiddenInset' as const,
-      trafficLightPosition: { x: 16, y: 15 }
+      trafficLightPosition: { x: 16, y: 11 }
     }),
     backgroundColor: '#121212',
     webPreferences: {

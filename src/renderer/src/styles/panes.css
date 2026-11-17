@@ -1,7 +1,7 @@
 .workspace {
   display: flex;
   min-height: 0;
-  padding: 6px;
+  padding: 0 6px 6px;
 }
 
 .region-layout {

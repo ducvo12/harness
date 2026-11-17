@@ -1,10 +1,10 @@
 @scope (.workspace-app) {
   .app-header {
-    height: 44px;
+    height: 34px;
     justify-content: flex-start;
     padding: 0 16px;
-    background: var(--surface-sidebar);
-    border-bottom: 1px solid var(--border-subtle);
+    background: transparent;
+    border-bottom: none;
     -webkit-app-region: drag;
   }
 
@@ -22,5 +22,9 @@
     font-size: 13px;
     font-weight: 600;
     letter-spacing: -0.2px;
+  }
+
+  .workspace {
+    padding-top: 0;
   }
 }
