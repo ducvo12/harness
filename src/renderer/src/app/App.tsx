@@ -29,9 +29,9 @@ import type {
 import ExplorerTab, {
   type ExplorerTabProps,
 } from "../components/workspace/explorer/ExplorerTab";
-import WorkspaceCreationDialog from "../features/organization/WorkspaceCreationDialog";
+import WorkspaceCreationDialog from "../components/workspace/WorkspaceCreationDialog";
 import type { ReadingPosition } from "../components/workspace/content/chat/transcript/Transcript";
-import Settings from "../features/connections/Settings";
+import Settings from "../components/settings/Settings";
 import type { FileDraft } from "../components/workspace/content/markdown/MarkdownView";
 import { TabBodyContext } from "../components/workspace/region/pane/TabBody";
 import {

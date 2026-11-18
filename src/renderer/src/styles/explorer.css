@@ -13,15 +13,10 @@
 .tree-row { border-radius: 5px; }
 .tree-row:hover,
 .tree-row:focus-within,
-.tree-row:has(> .tree-entry.selected),
-.tree-row:has(> .tree-action[aria-haspopup="menu"][aria-expanded="true"]) { background: var(--surface-hover); }
+.tree-row:has(> .tree-entry.selected) { background: var(--surface-hover); }
 /* The row owns its highlight; labels and action buttons share that surface. */
 .tree-row > .tree-chevron { flex-basis: 13px; width: 13px; font-size: 14px; }
 .tree-empty { padding: 6px 5px; color: var(--text-faint); font-size: 11px; line-height: 1.6; }
-.tree-menu { position: fixed; z-index: 120; min-width: 215px; max-width: calc(100vw - 12px); padding: 5px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface-sidebar); color: var(--text); box-shadow: 0 8px 30px #0006; }
-.tree-menu > button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 6px 9px; border: 0; border-radius: 4px; background: transparent; color: var(--text); text-align: left; }
-.tree-menu > button:hover:not(:disabled), .tree-menu > button:focus-visible { background: var(--surface-hover); }
-.tree-menu-label { padding: 7px 9px 4px; font-size: 10px; color: var(--text-muted); }
 .tree-dialog { width: 440px; max-width: 100%; max-height: 85vh; overflow: auto; padding: 24px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); box-shadow: 0 20px 80px #0008; }
 .tree-dialog h2 { margin: 0 0 20px; font-size: 18px; font-weight: 500; }
 .tree-dialog label { display: block; margin: 14px 0; font-size: 12px; color: var(--text-secondary); }

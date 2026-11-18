@@ -2,7 +2,7 @@ import { Children, isValidElement, useId, useLayoutEffect, useRef, useState, typ
 import { createPortal } from 'react-dom'
 
 type OptionProps = { value: string; disabled?: boolean; children?: ReactNode }
-export function SelectOption(_props: OptionProps) { return null }
+export function DropdownMenuOption(_props: OptionProps) { return null }
 function textOf(node: ReactNode): string {
   return Children.toArray(node).map(child => isValidElement<{ children?: ReactNode }>(child) ? textOf(child.props.children) : String(child)).join('')
 }
@@ -19,12 +19,13 @@ type Props = {
   placeholder?: string
 }
 
-export default function Select({ value, onChange, children, disabled, title, editable, required, placeholder, 'aria-label': ariaLabel }: Props) {
+/** Shows a dropdown list of values. Editable mode also accepts typed values. */
+export default function DropdownMenu({ value, onChange, children, disabled, title, editable, required, placeholder, 'aria-label': ariaLabel }: Props) {
   const options: OptionProps[] = []
   function collect(nodes: ReactNode) {
     Children.forEach(nodes, child => {
       if (!isValidElement<OptionProps>(child)) return
-      if (child.type === SelectOption) options.push(child.props)
+      if (child.type === DropdownMenuOption) options.push(child.props)
       else collect(child.props.children)
     })
   }

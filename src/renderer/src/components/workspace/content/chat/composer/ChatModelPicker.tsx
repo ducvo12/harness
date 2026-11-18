@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import Select, { SelectOption } from '../../../../Select'
+import DropdownMenu, { DropdownMenuOption } from '../../../../controls/DropdownMenu'
 import type { SavedConnection } from '../../../../../../../shared/chat'
 import type { ModelSelection } from './useConnectionModel'
 
@@ -44,18 +44,18 @@ export default function ChatModelPicker({
   return (
     <>
       <div className="composer-model">
-        <Select
+        <DropdownMenu
           aria-label="Active connection"
           title={selection.locked ? 'Start a new chat to change connections' : 'Select connection'}
           value={connection?.id ?? ''}
           disabled={disabled || selection.locked}
           onChange={event => onSelectConnection(event.target.value)}
         >
-          <SelectOption value="" disabled>Select connection</SelectOption>
+          <DropdownMenuOption value="" disabled>Select connection</DropdownMenuOption>
           {connections.map(item => (
-            <SelectOption key={item.id} value={item.id}>{item.name}</SelectOption>
+            <DropdownMenuOption key={item.id} value={item.id}>{item.name}</DropdownMenuOption>
           ))}
-        </Select>
+        </DropdownMenu>
       </div>
 
       {connection && (
@@ -94,7 +94,7 @@ export default function ChatModelPicker({
                 </>
               )}
               {connection.provider === 'chatgpt' && (
-                <Select
+                <DropdownMenu
                   aria-label="ChatGPT model"
                   value={selection.model}
                   disabled={selection.locked || selection.loading}
@@ -102,9 +102,9 @@ export default function ChatModelPicker({
                   onChange={event => selection.select(event.target.value)}
                 >
                   {selection.models.map(model => (
-                    <SelectOption key={model.id} value={model.id}>{model.name}</SelectOption>
+                    <DropdownMenuOption key={model.id} value={model.id}>{model.name}</DropdownMenuOption>
                   ))}
-                </Select>
+                </DropdownMenu>
               )}
               {connection.provider !== 'chatgpt' && <div className="effort-model-caption">{modelName}</div>}
               {supported && (

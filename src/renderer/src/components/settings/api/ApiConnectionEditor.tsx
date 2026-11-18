@@ -1,11 +1,9 @@
-import Select, { SelectOption } from '../../components/Select'
+import DropdownMenu, { DropdownMenuOption } from '../../controls/DropdownMenu'
 import type { FormEvent, RefObject } from 'react'
-import type { ConnectionDraft, SavedConnection } from '../../../../shared/chat'
-import ChatGPTConnectionEditor from './chatgpt/ChatGPTConnectionEditor'
-import { findPresetForConnection } from './presets'
+import type { ConnectionDraft, SavedConnection } from '../../../../../shared/chat'
+import { findPresetForConnection } from '../presets'
 
 type Props = {
-  connections: SavedConnection[]
   editing: ConnectionDraft
   original: SavedConnection | undefined
   models: string[]
@@ -17,8 +15,7 @@ type Props = {
   onLoadModels: () => Promise<void>
 }
 
-export default function ConnectionEditor({
-  connections,
+export default function ApiConnectionEditor({
   editing,
   original,
   models,
@@ -34,23 +31,6 @@ export default function ConnectionEditor({
 
   const changedEndpoint =
     original && original.baseUrl !== editing.baseUrl.trim().replace(/\/+$/, '')
-
-  if (editing.provider === 'chatgpt') {
-    return (
-      <ChatGPTConnectionEditor
-        connections={connections}
-        editing={editing}
-        original={original}
-        busy={busy}
-        models={models}
-        onLoadModels={onLoadModels}
-        field={field}
-        onSave={onSave}
-        onCancel={onCancel}
-        nameInput={nameInput}
-      />
-    )
-  }
 
   const isKeyRequired = !isCustom && !original?.hasKey
 
@@ -135,7 +115,7 @@ export default function ConnectionEditor({
         <div className="model-field">
           <label>
             Model ID
-            <Select
+            <DropdownMenu
               editable
               required
               aria-label="Model ID"
@@ -144,11 +124,11 @@ export default function ConnectionEditor({
               placeholder={preset.placeholderModel || 'Load models or enter an ID'}
             >
               {models.map(model => (
-                <SelectOption key={model} value={model}>
+                <DropdownMenuOption key={model} value={model}>
                   {model}
-                </SelectOption>
+                </DropdownMenuOption>
               ))}
-            </Select>
+            </DropdownMenu>
           </label>
 
           <button
@@ -183,17 +163,17 @@ export default function ConnectionEditor({
 
         <label>
           Default reasoning effort
-          <Select
+          <DropdownMenu
             value={editing.effort ?? ''}
             onChange={event => field('effort', event.target.value)}
           >
-            <SelectOption value="">Model default</SelectOption>
+            <DropdownMenuOption value="">Model default</DropdownMenuOption>
             {['low', 'medium', 'high', 'xhigh', 'max', 'ultra'].map(effort => (
-              <SelectOption key={effort} value={effort}>
+              <DropdownMenuOption key={effort} value={effort}>
                 {effort}
-              </SelectOption>
+              </DropdownMenuOption>
             ))}
-          </Select>
+          </DropdownMenu>
         </label>
       </fieldset>
 

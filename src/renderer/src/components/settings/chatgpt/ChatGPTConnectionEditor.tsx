@@ -1,4 +1,4 @@
-import Select, { SelectOption } from '../../../components/Select'
+import DropdownMenu, { DropdownMenuOption } from '../../controls/DropdownMenu'
 import { useEffect, useState, type FormEvent, type RefObject } from 'react'
 import type { ConnectionDraft, SavedConnection } from '../../../../../shared/chat'
 import type { ChatGPTAccount } from '../../../../../shared/harness'
@@ -190,29 +190,29 @@ export default function ChatGPTConnectionEditor({
           <label>
             Default model
 
-            <Select
+            <DropdownMenu
               editable
               value={editing.model}
               onChange={event => field('model', event.target.value)}
               disabled={!account?.planEnabled}
               placeholder="Automatic · first available model"
             >
-              <SelectOption value="">
+              <DropdownMenuOption value="">
                 Automatic · first available model
-              </SelectOption>
+              </DropdownMenuOption>
 
               {editing.model && !models.includes(editing.model) && (
-                <SelectOption value={editing.model}>
+                <DropdownMenuOption value={editing.model}>
                   {editing.model}
-                </SelectOption>
+                </DropdownMenuOption>
               )}
 
               {models.map(model => (
-                <SelectOption key={model} value={model}>
+                <DropdownMenuOption key={model} value={model}>
                   {model}
-                </SelectOption>
+                </DropdownMenuOption>
               ))}
-            </Select>
+            </DropdownMenu>
           </label>
 
           <button
@@ -243,20 +243,20 @@ export default function ChatGPTConnectionEditor({
         <label>
           Default reasoning effort
 
-          <Select
+          <DropdownMenu
             value={editing.effort ?? ''}
             onChange={event => field('effort', event.target.value)}
           >
-            <SelectOption value="">
+            <DropdownMenuOption value="">
               Model default
-            </SelectOption>
+            </DropdownMenuOption>
 
             {['low', 'medium', 'high', 'xhigh', 'max', 'ultra'].map(effort => (
-              <SelectOption key={effort} value={effort}>
+              <DropdownMenuOption key={effort} value={effort}>
                 {effort}
-              </SelectOption>
+              </DropdownMenuOption>
             ))}
-          </Select>
+          </DropdownMenu>
         </label>
       </fieldset>
 

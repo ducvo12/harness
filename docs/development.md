@@ -131,7 +131,7 @@ Before merging the workspace into `main`, verify all four:
 | `src/backend/auth/`, `connections/`, `models/` | Independent sign-in, encrypted connection/account storage and model access. |
 | `src/backend/workspace/` | Protected agent files, initialization and file viewing. |
 | `src/shared/` | Types across the desktop bridge. |
-| `src/renderer/src/app/`, `features/`, `styles/` | Composition/session state, feature views and styling. |
+| `src/renderer/src/app/`, `components/`, `styles/` | Composition/session state, UI components and styling. |
 
 Keep Electron main and the worker built independently. The renderer has no Node integration, uses context isolation/sandboxing, and receives no saved model credentials. Validated HTTP/HTTPS links open in the system browser; arbitrary new windows/navigation and file/application links remain blocked.
 
