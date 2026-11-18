@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { addTab, closeTab, selectTab } from '../src/renderer/src/components/panes/tabs.ts'
-import { addPane, createPane, findPane, moveTab, dockPane, dockTab, layoutFits, paneRects, removePane, updatePane } from '../src/renderer/src/components/panes/layout.ts'
+import { addTab, closeTab, selectTab } from '../src/renderer/src/components/workspace/layout/tabs.ts'
+import { addPane, createPane, findPane, moveTab, dockPane, dockTab, layoutFits, paneRects, removePane, updatePane } from '../src/renderer/src/components/workspace/layout/layout.ts'
 
 import { initialLayout } from './fixtures/panes.ts'
 

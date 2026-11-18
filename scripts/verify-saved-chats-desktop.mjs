@@ -391,6 +391,21 @@ async function verifyMarkdown({ evaluate, click, fill, wait }, root) {
   assert.doesNotMatch(await evaluate('document.querySelector(".notes-tree").textContent'), /example\.png/)
   await click('nested/')
   await wait(() => evaluate(`Boolean(${findFile('/notes/nested/Plan.md')})`), 'nested Markdown file appears')
+
+  const addedFile = 'Added from Finder.md'
+  const addedNote = '/notes/nested/Added note.md'
+  await writeFile(join(root, addedFile), '# Added file')
+  await writeFile(join(root, addedNote), '# Added note')
+  await writeFile(join(root, 'Unsupported.txt'), 'Unsupported root file')
+  await writeFile(join(root, 'notes', 'nested', 'Unsupported.jpg'), 'Unsupported nested file')
+  await evaluate("window.dispatchEvent(new Event('focus'))")
+  await wait(() => evaluate(`Boolean(${findFile(addedFile)} && ${findFile(addedNote)})`), 'root and expanded folder refresh on window focus')
+  assert.equal(await evaluate(`Boolean(${findFile('Unsupported.txt')} || ${findFile('/notes/nested/Unsupported.jpg')})`), false)
+
+  await rm(join(root, addedNote))
+  await evaluate("window.dispatchEvent(new Event('focus'))")
+  await wait(() => evaluate(`!${findFile(addedNote)}`), 'deleted file disappears on window focus')
+
   await openFile('/notes/nested/Plan.md')
   await preview('Nested plan')
   await click('Edit')
@@ -398,7 +413,7 @@ async function verifyMarkdown({ evaluate, click, fill, wait }, root) {
   await click('Cancel')
   await preview('Nested plan')
   assert.equal(await readFile(join(root, 'notes', 'nested', 'Plan.md'), 'utf8'), '# Nested plan')
-  console.log('Markdown discovery, preview, draft protection, revision checks, Save, and Cancel passed.')
+  console.log('Markdown discovery, external refresh, file filtering, preview, draft protection, revision checks, Save, and Cancel passed.')
 }
 
 function seedProfile() {
@@ -741,7 +756,7 @@ try {
       .dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true }))`)
     const geometry = () => evaluate(`({
       regions: Array.from(document.querySelectorAll('[data-region]'), node => [node.dataset.region, Math.round(node.getBoundingClientRect().width)]),
-      dividers: Array.from(document.querySelectorAll('[role=separator]'), node => [node.ariaLabel, node.ariaValueNow]),
+      dividers: Array.from(document.querySelectorAll('[role=separator]'), node => [node.ariaLabel, node.offsetLeft, node.offsetTop]),
       panes: Array.from(document.querySelectorAll('[data-pane-id]'), pane => ({
         id: pane.dataset.paneId,
         tabs: Array.from(pane.querySelectorAll('[role=tab]'), tab => [tab.id, tab.ariaSelected])
@@ -758,11 +773,16 @@ try {
     const innerDivider = '[aria-label="Resize Content groups"]'
     await wait(() => evaluate(`Boolean(document.querySelector(${JSON.stringify(innerDivider)}))`), 'file has its own pane')
     const outerDivider = '[aria-label="Resize regions"]'
-    const beforeResize = await geometry()
-    await keyDown(innerDivider, 'ArrowLeft')
-    await keyDown(outerDivider, 'ArrowLeft')
-    const afterResize = await geometry()
-    assert.ok(afterResize.dividers.every((divider, index) => divider[1] !== beforeResize.dividers[index][1]))
+    for (const divider of [innerDivider, outerDivider]) {
+      const origin = await point(divider)
+      const target = { ...origin, x: origin.x - 24 }
+      await rpc('Input.dispatchMouseEvent', { type: 'mouseMoved', ...origin })
+      await rpc('Input.dispatchMouseEvent', { type: 'mousePressed', ...origin, button: 'left', buttons: 1, clickCount: 1 })
+      await wait(() => evaluate('Boolean(document.querySelector(".pane-divider.is-resizing"))'), 'divider resize starts')
+      await rpc('Input.dispatchMouseEvent', { type: 'mouseMoved', ...target, buttons: 1 })
+      await rpc('Input.dispatchMouseEvent', { type: 'mouseReleased', ...target, button: 'left', buttons: 0, clickCount: 1 })
+      await wait(async () => (await point(divider)).x < origin.x, 'divider moves after drag')
+    }
     await keyDown('[aria-label="Move Explorer region"]', 'ArrowRight')
     await wait(() => evaluate('document.querySelector("[data-region]").dataset.region === "content"'), 'regions swap')
 

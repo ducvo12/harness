@@ -1,7 +1,7 @@
 import type { Conversation } from '../../../shared/agent.ts'
-import { createPane, updatePane, type Layout, type PaneNode } from '../components/panes/layout.ts'
-import { updateRegion, type RegionLayout } from '../components/panes/regions.ts'
-import { addTab, selectTab, type DraftChatDestination, type FileDestination, type NewTab, type Tab } from '../components/panes/tabs.ts'
+import { createPane, updatePane, type Layout, type PaneNode } from '../components/workspace/layout/layout.ts'
+import { updateRegion, type RegionLayout } from '../components/workspace/layout/regions.ts'
+import { addTab, selectTab, type DraftChatDestination, type FileDestination, type NewTab, type Tab } from '../components/workspace/layout/tabs.ts'
 
 export function findTab(layout: Layout | null, matches: (tab: Tab) => boolean): { pane: PaneNode; tab: Tab } | undefined {
   if (!layout) return

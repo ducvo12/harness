@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { attachmentTextLimit, messageTextLimit } from '../src/shared/chat-limits.ts'
-import { readAttachments, messageWithAttachments, sentAttachments } from '../src/renderer/src/features/chat/attachments.ts'
+import { readAttachments, messageWithAttachments, sentAttachments } from '../src/renderer/src/components/workspace/content/chat/chatcomponents/attachments.ts'
 
 test('text files are sent with the message and can be recovered from saved chat history', async () => {
   const files = await readAttachments([new File(['hello\nworld'], 'notes.md')], [])

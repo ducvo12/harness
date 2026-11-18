@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Conversation } from '../src/shared/agent.ts'
 import type { Project, Section } from '../src/shared/organization.ts'
-import { readTreeSort, sortTreeEntries } from '../src/renderer/src/app/tree-sort.ts'
+import { readTreeSort, sortTreeEntries } from '../src/renderer/src/components/workspace/explorer/tree-sort.ts'
 
 const chats: Conversation[] = [
   { id: 'a', agentId: 'agent', title: 'Zebra', sectionId: 's1', projectId: null, updatedAt: 5000, createdAt: 100, lastChattedAt: 200, retention: 'permanent', expiresAt: null },

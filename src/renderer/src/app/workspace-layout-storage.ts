@@ -2,10 +2,10 @@ import { z } from 'zod/mini'
 import type { Agent } from '../../../shared/agent.ts'
 import type { GraniteBridge } from '../../../shared/chat.ts'
 import { isWorkspaceMarkdown } from '../../../shared/workspace-markdown.ts'
-import type { Layout, PaneNode } from '../components/panes/layout.ts'
-import { acceptsTab } from '../components/panes/pane-types.ts'
-import { initialRegions, updateRegion, type RegionLayout } from '../components/panes/regions.ts'
-import type { Tab } from '../components/panes/tabs.ts'
+import type { Layout, PaneNode } from '../components/workspace/layout/layout.ts'
+import { acceptsTab } from '../components/workspace/layout/pane-types.ts'
+import { initialRegions, updateRegion, type RegionLayout } from '../components/workspace/layout/regions.ts'
+import type { Tab } from '../components/workspace/layout/tabs.ts'
 
 export interface SavedWorkspaceLayout {
   layout: RegionLayout

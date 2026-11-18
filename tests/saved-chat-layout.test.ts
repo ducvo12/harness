@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Conversation } from '../src/shared/agent.ts'
 import { findTab, openSavedChat } from '../src/renderer/src/app/saved-chat-layout.ts'
-import { dockTab, removePane, type Layout } from '../src/renderer/src/components/panes/layout.ts'
-import { initialRegions, updateRegion, type RegionLayout } from '../src/renderer/src/components/panes/regions.ts'
+import { dockTab, removePane, type Layout } from '../src/renderer/src/components/workspace/layout/layout.ts'
+import { initialRegions, updateRegion, type RegionLayout } from '../src/renderer/src/components/workspace/layout/regions.ts'
 
 const chat: Conversation = {
   id: 'saved', agentId: 'atlas', title: 'Saved chat', sectionId: 'general', projectId: null,

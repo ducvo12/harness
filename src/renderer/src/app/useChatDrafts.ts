@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { z } from 'zod/mini'
 import type { Agent, ConversationDetail } from '../../../shared/agent'
-import type { ChatDestination } from '../components/panes/tabs'
-import type { ComposerDraft } from '../features/chat/WorkspaceChat'
+import type { ChatDestination } from '../components/workspace/layout/tabs'
+import type { ComposerDraft } from '../components/workspace/content/chat/ChatView'
 
 const storageKey = 'granite.workspace.chat-drafts'
 const draftSchema = z.object({

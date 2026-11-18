@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeMathDelimiters } from '../src/renderer/src/features/chat/math-delimiters.ts'
+import { normalizeMathDelimiters } from '../src/renderer/src/components/workspace/content/formatting/math-delimiters.ts'
 
 test('LaTeX inline and display delimiters normalize while existing dollar math remains intact', () => {
   assert.equal(normalizeMathDelimiters('Inline \\(x^2\\) and $y$.'), 'Inline $x^2$ and $y$.')

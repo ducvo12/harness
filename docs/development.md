@@ -320,8 +320,25 @@ Pass 5 concludes the 5-pass codebase cleanup, consolidating changes, eliminating
 
 ## Future optimizations
 
+### Section notes and reusable files
+
+- Defer a section Notes UI. Keep existing notes on disk and preserve scoped
+  retrieval while deciding whether agents should maintain reference material
+  across chats.
+- Use repository `AGENTS.md` for repo-specific instructions and agent
+  `identity.md` for agent-wide instructions. Consider a single editable
+  instructions file for a section or project without a repository if users
+  need scope-specific guidance.
+- Consider letting users copy an image or file from another chat or save it
+  somewhere durable. Define file ownership and access across Shared and Closed
+  sections before adding cross-chat transfers.
+
 ### Chat attachments
 
+- If attachments become more frequent or larger, move image data from message
+  JSON to a separate SQLite attachments table. Link each attachment to its
+  message and store the raw bytes as a BLOB. Load transcript text and
+  attachment names first, then fetch image bytes when needed.
 - Add Word (`.docx`) attachments. Extract paragraphs and table text locally,
   preserve their reading order, and apply the existing text attachment limit.
 

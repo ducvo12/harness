@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { addPane, createPane, removePane, dockPane, groupDockEdge, tabDockEdge, paneRects, resizeSplit, type Layout } from '../src/renderer/src/components/panes/layout.ts'
+import { addPane, createPane, removePane, dockPane, groupDockEdge, tabDockEdge, paneRects, resizeSplit, type Layout } from '../src/renderer/src/components/workspace/layout/layout.ts'
 
 import { initialLayout } from './fixtures/panes.ts'
 

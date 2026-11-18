@@ -1,4 +1,4 @@
-import { createPane, type Layout } from '../../src/renderer/src/components/panes/layout.ts'
+import { createPane, type Layout } from '../../src/renderer/src/components/workspace/layout/layout.ts'
 
 // A region's group tree is homogeneous; mixed families belong to separate outer regions.
 export const initialLayout: Layout = {

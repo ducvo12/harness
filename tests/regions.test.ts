@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createPane, dockTab, findPane, minimumPaneSize, removePane } from '../src/renderer/src/components/panes/layout.ts'
-import { addTab } from '../src/renderer/src/components/panes/tabs.ts'
-import { initialRegions, regionGap, regionRects, regionSwapAt, regionsMinimum, resizeRegions, swapRegions, updateRegion, type RegionLayout } from '../src/renderer/src/components/panes/regions.ts'
+import { createPane, dockTab, findPane, minimumPaneSize, removePane } from '../src/renderer/src/components/workspace/layout/layout.ts'
+import { addTab } from '../src/renderer/src/components/workspace/layout/tabs.ts'
+import { initialRegions, regionGap, regionRects, regionSwapAt, regionsMinimum, resizeRegions, swapRegions, updateRegion, type RegionLayout } from '../src/renderer/src/components/workspace/layout/regions.ts'
 
 const bounds = { x: 0, y: 0, width: 1100, height: 700 }
 

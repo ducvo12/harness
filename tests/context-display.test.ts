@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { contextDisplay, latestContextResponse } from '../src/renderer/src/features/chat/context-display.ts'
+import { contextDisplay, latestContextResponse } from '../src/renderer/src/components/workspace/content/chat/chatcomponents/context-display.ts'
 
 const base = { loading: false, hasResponse: false, busy: false }
 const rows = ['used', 'limit', 'input', 'output', 'cached', 'reasoning', 'maxOutput'] as const

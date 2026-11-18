@@ -345,19 +345,8 @@
 }
 
 .pane-divider:hover::after,
-.pane-divider:focus-visible::after,
 .pane-divider.is-resizing::after {
   opacity: 1;
-}
-
-.pane-divider:focus-visible {
-  outline: 1px solid var(--focus);
-  outline-offset: -2px;
-}
-
-.pane-split > .pane-divider:focus-visible {
-  outline-offset: 0;
-  background: var(--focus);
 }
 
 .pane-split-vertical > .pane-divider {
