@@ -91,7 +91,7 @@ ChatGPT sign-in validates OAuth state, PKCE, the ID-token signature, issuer, aud
 - `src/backend/harness/`: Granite’s loop, permissions/approvals, per-agent settings, provider adapters, file/skill/MCP/terminal tools.
 - `src/backend/auth/`: independent ChatGPT authorization and protected account storage.
 - `src/backend/agents/`: agent lifecycle, worker bridge, SQLite display/native state, and legacy storage migration.
-- `src/renderer/src/features/harness/`: the live approval prompt.
+- `src/renderer/src/components/workspace/content/chat/run/` contains the live approval and question prompts.
 
 The filesystem backend remains a library utility; no external agent framework runs the tool loop. The historical SQLite checkpoint library remains for migration and cleanup. Electron main and the agent worker are built independently so shared bundler helpers cannot cause main to execute the worker entry point.
 

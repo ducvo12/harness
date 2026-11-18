@@ -135,6 +135,29 @@ Before merging the workspace into `main`, verify all four:
 
 Keep Electron main and the worker built independently. The renderer has no Node integration, uses context isolation/sandboxing, and receives no saved model credentials. Validated HTTP/HTTPS links open in the system browser; arbitrary new windows/navigation and file/application links remain blocked.
 
+### Renderer component reorganization
+
+The renderer now groups UI code under `components/`. The former `features/`
+files moved alongside the screens that use them. The layout follows the scope
+of each component and keeps screen-specific behavior beside the controls that
+trigger it, so the code is easier to find from the interface.
+
+- `components/workspace/` contains the workspace shell, Explorer, content views,
+  and pane layout. Explorer triggers agent, section, and project creation.
+  `WorkspaceCreationDialog.tsx` sits beside `Workspace.tsx` because `App.tsx`
+  opens it as a modal for the entire window.
+- `components/settings/` contains the Connections screen opened from Settings.
+  `Settings.tsx` switches between the list and editor and passes saved
+  connection updates back to the app. `ConnectionList.tsx` handles disconnect
+  confirmation, deletion, and model refresh for saved connections.
+  `ConnectionEditor.tsx` owns the draft, loads models for it, and saves it.
+  The provider-specific forms live in sibling `api/` and `chatgpt/` folders
+  and use the same editing workflow.
+- `components/controls/DropdownMenu.tsx` is shared by Settings and the chat
+  composer. Its name describes the UI, and editable mode also accepts typed
+  values. `components/icons/` holds the Chevron and TreeActionIcon SVG
+  components. The unused `TreeMenu` popup and its dedicated CSS were removed.
+
 ## Readability conventions
 
 Use two spaces, single quotes in TypeScript and one statement per line. Separate validation, state updates, requests and cleanup with blank lines. Group related state; separate effects and class methods.
