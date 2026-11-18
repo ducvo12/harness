@@ -15,7 +15,7 @@ const draftSchema = z.object({
 })
 const snapshot = z.object({ version: z.literal(1), drafts: z.array(draftSchema) })
 
-type ChatDraft = z.output<typeof draftSchema>
+export type ChatDraft = z.output<typeof draftSchema>
 type Drafts = ReadonlyMap<string, ChatDraft>
 
 export const emptyChatDraft: ComposerDraft = { text: '', attachments: [] }

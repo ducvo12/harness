@@ -52,7 +52,6 @@ export type LayoutUpdate = (
 
 interface WorkspaceProps {
   layout: RegionLayout;
-  renderTab: (tab: Tab) => ReactNode;
   tabCloseReason: (tab: Tab) => string | undefined;
   renderEmptyRegion: (type: PaneType) => ReactNode;
   onLayoutChange: (layout: LayoutUpdate) => void;
@@ -129,7 +128,6 @@ function measureSplit(
 // Share pointer capture and cancellation across region swaps, group docking, and resizing.
 export default function Workspace({
   layout,
-  renderTab,
   tabCloseReason,
   renderEmptyRegion,
   onLayoutChange,
@@ -501,7 +499,6 @@ export default function Workspace({
   function getPaneProps(region: PaneType, node: PaneNode): RegionPaneProps {
     const dragging = drag?.kind === "group" && drag.pane.id === node.id;
     return {
-      renderTab,
       tabCloseReason,
       dropEdge: drop?.target?.paneId === node.id ? drop.target.edge : undefined,
       floating: dragging && wholePaneDrag ? floating : undefined,

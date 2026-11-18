@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { RepositoryReport, RepositoryCommandSnapshot } from '../src/shared/repository.ts'
-import { activePreviews, activitySummary } from '../src/renderer/src/components/workspace/content/chat/chatcomponents/activity-summary.ts'
+import { activePreviews, activitySummary } from '../src/renderer/src/components/workspace/content/chat/activity/activity-summary.ts'
 
 function report(runId: string, added: number, state: RepositoryReport['state'] = 'settled'): RepositoryReport {
   return { runId, projectId: 'project', name: 'Project', state, preExisting: 0,

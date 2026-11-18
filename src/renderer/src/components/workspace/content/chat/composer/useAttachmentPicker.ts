@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { readAttachments, type ChatAttachment } from './attachments'
+import { readAttachments, type ChatAttachment } from '../attachments'
 
 export function useAttachmentPicker(
   scope: string,

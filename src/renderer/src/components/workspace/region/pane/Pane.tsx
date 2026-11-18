@@ -1,73 +1,108 @@
-import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent, type PointerEventHandler, type ReactNode } from 'react'
-import type { Edge, PaneNode } from '../../layout/layout'
-import type { Tab } from '../../layout/tabs'
+import {
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  type PointerEventHandler,
+} from "react";
+import type { Edge, PaneNode } from "../../layout/layout";
+import type { Tab } from "../../layout/tabs";
+import TabBody from "./TabBody";
 
 export interface PaneProps {
-  pane: PaneNode
-  renderTab: (tab: Tab) => ReactNode
-  tabCloseReason: (tab: Tab) => string | undefined
-  dropEdge?: Edge
-  floating?: Pick<CSSProperties, 'left' | 'top' | 'width' | 'height' | 'translate'>
-  hasRegionHandle?: boolean
-  draggedTabId?: string
-  onTabDragStart: (tab: Tab, event: PointerEvent<HTMLButtonElement>) => void
-  onDragStart: PointerEventHandler<HTMLDivElement>
-  onClose: () => void
-  onAddTab: (titlebar: HTMLDivElement | null) => void
-  onSelectTab: (id: string) => void
-  onCloseTab: (id: string, titlebar: HTMLDivElement | null) => void
+  pane: PaneNode;
+  tabCloseReason: (tab: Tab) => string | undefined;
+  dropEdge?: Edge;
+  floating?: Pick<
+    CSSProperties,
+    "left" | "top" | "width" | "height" | "translate"
+  >;
+  hasRegionHandle?: boolean;
+  draggedTabId?: string;
+  onTabDragStart: (tab: Tab, event: PointerEvent<HTMLButtonElement>) => void;
+  onDragStart: PointerEventHandler<HTMLDivElement>;
+  onClose: () => void;
+  onAddTab: (titlebar: HTMLDivElement | null) => void;
+  onSelectTab: (id: string) => void;
+  onCloseTab: (id: string, titlebar: HTMLDivElement | null) => void;
 }
 
 // Keep the pane's layout slot stable while its surface floats. Tabs are controlled
 // by the layout so moving the pane cannot discard their state.
-export default function Pane({ pane, renderTab, tabCloseReason, dropEdge, floating, hasRegionHandle = false, draggedTabId, onTabDragStart, onDragStart, onClose, onAddTab, onSelectTab, onCloseTab }: PaneProps) {
-  const active = pane.tabs.find(tab => tab.id === pane.activeTabId)!
-  const paneCloseReason = pane.tabs.map(tabCloseReason).find(Boolean)
-  const titlebar = useRef<HTMLDivElement>(null)
+export default function Pane({
+  pane,
+  tabCloseReason,
+  dropEdge,
+  floating,
+  hasRegionHandle = false,
+  draggedTabId,
+  onTabDragStart,
+  onDragStart,
+  onClose,
+  onAddTab,
+  onSelectTab,
+  onCloseTab,
+}: PaneProps) {
+  const active = pane.tabs.find((tab) => tab.id === pane.activeTabId)!;
+  const paneCloseReason = pane.tabs.map(tabCloseReason).find(Boolean);
+  const titlebar = useRef<HTMLDivElement>(null);
 
   // Keep the selected tab reachable when the strip has more tabs than fit on screen.
   useEffect(() => {
-    document.getElementById(pane.activeTabId)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [pane.activeTabId])
+    document
+      .getElementById(pane.activeTabId)
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [pane.activeTabId]);
 
   // Arrow keys wrap through tabs; Home and End select the first and last tab.
   function navigateTabs(event: KeyboardEvent<HTMLButtonElement>) {
-    const index = pane.tabs.findIndex(tab => tab.id === pane.activeTabId)
-    let next: number
-    if (event.key === 'ArrowRight') next = (index + 1) % pane.tabs.length
-    else if (event.key === 'ArrowLeft') next = (index - 1 + pane.tabs.length) % pane.tabs.length
-    else if (event.key === 'Home') next = 0
-    else if (event.key === 'End') next = pane.tabs.length - 1
-    else return
-    event.preventDefault()
-    onSelectTab(pane.tabs[next].id)
-    document.getElementById(pane.tabs[next].id)!.focus()
+    const index = pane.tabs.findIndex((tab) => tab.id === pane.activeTabId);
+    let next: number;
+    if (event.key === "ArrowRight") next = (index + 1) % pane.tabs.length;
+    else if (event.key === "ArrowLeft")
+      next = (index - 1 + pane.tabs.length) % pane.tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = pane.tabs.length - 1;
+    else return;
+    event.preventDefault();
+    onSelectTab(pane.tabs[next].id);
+    document.getElementById(pane.tabs[next].id)!.focus();
   }
 
   // Keep focus inside the pane when a close button would otherwise be removed.
   function closeTab(id: string) {
-    const index = pane.tabs.findIndex(tab => tab.id === id)
-    const next = id === pane.activeTabId ? pane.tabs[index + 1] ?? pane.tabs[index - 1] : active
-    if (next) document.getElementById(next.id)!.focus()
-    onCloseTab(id, titlebar.current)
+    const index = pane.tabs.findIndex((tab) => tab.id === id);
+    const next =
+      id === pane.activeTabId
+        ? (pane.tabs[index + 1] ?? pane.tabs[index - 1])
+        : active;
+    if (next) document.getElementById(next.id)!.focus();
+    onCloseTab(id, titlebar.current);
   }
 
   return (
-    <div className={`pane-slot${floating ? ' pane-slot-dragging' : ''}`}>
+    <div className={`pane-slot${floating ? " pane-slot-dragging" : ""}`}>
       <section
-        className={`pane${floating ? ' pane-floating' : ''}${hasRegionHandle && !floating ? ' has-region-handle' : ''}`}
+        className={`pane${floating ? " pane-floating" : ""}${hasRegionHandle && !floating ? " has-region-handle" : ""}`}
         aria-label={pane.title}
         data-pane-type={pane.paneType}
         data-pane-id={pane.id}
-        style={{ ...floating, '--vt': `pane-${pane.id}` } as CSSProperties}
+        style={{ ...floating, "--vt": `pane-${pane.id}` } as CSSProperties}
       >
         <div className="pane-titlebar" ref={titlebar}>
-          <div className="pane-tabs" role="tablist" aria-label={`${pane.title} tabs`} style={{ '--vt': `strip-${pane.id}` } as CSSProperties}>
-            {pane.tabs.map(tab => (
+          <div
+            className="pane-tabs"
+            role="tablist"
+            aria-label={`${pane.title} tabs`}
+            style={{ "--vt": `strip-${pane.id}` } as CSSProperties}
+          >
+            {/* Tab Bar and Tab names */}
+            {pane.tabs.map((tab) => (
               <div
-                className={`pane-tab${tab.id === pane.activeTabId ? ' is-active' : ''}${tab.id === draggedTabId ? ' is-dragging' : ''}`}
+                className={`pane-tab${tab.id === pane.activeTabId ? " is-active" : ""}${tab.id === draggedTabId ? " is-dragging" : ""}`}
                 key={tab.id}
-                style={{ '--vt': `tab-${tab.id}` } as CSSProperties}
+                style={{ "--vt": `tab-${tab.id}` } as CSSProperties}
               >
                 <button
                   type="button"
@@ -77,7 +112,7 @@ export default function Pane({ pane, renderTab, tabCloseReason, dropEdge, floati
                   aria-selected={tab.id === pane.activeTabId}
                   aria-controls={`${pane.id}-panel`}
                   tabIndex={tab.id === pane.activeTabId ? 0 : -1}
-                  onPointerDown={event => onTabDragStart(tab, event)}
+                  onPointerDown={(event) => onTabDragStart(tab, event)}
                   onClick={() => onSelectTab(tab.id)}
                   onKeyDown={navigateTabs}
                 >
@@ -98,39 +133,59 @@ export default function Pane({ pane, renderTab, tabCloseReason, dropEdge, floati
             ))}
           </div>
 
-          {pane.paneType === 'explorer' && (
+          {/* Plus Icon next to explorer tabs */}
+          {pane.paneType === "explorer" && (
             <button
               type="button"
               className="tab-add quiet-button"
               aria-label={`Add tab to ${pane.title}`}
-              style={{ '--vt': `add-${pane.id}` } as CSSProperties}
+              style={{ "--vt": `add-${pane.id}` } as CSSProperties}
               onClick={() => onAddTab(titlebar.current)}
             >
               +
             </button>
           )}
 
-          <div className="pane-drag-handle" onPointerDown={onDragStart} title={`Drag ${pane.title}`} />
+          {/* Drag Handler */}
+          <div
+            className="pane-drag-handle"
+            onPointerDown={onDragStart}
+            title={`Drag ${pane.title}`}
+          />
 
+          {/* X button that closes the entire pane */}
           <button
             type="button"
             className="pane-close quiet-button"
             aria-label={`Close ${pane.title}`}
             title={paneCloseReason ?? `Close ${pane.title}`}
             disabled={Boolean(paneCloseReason)}
-            style={{ '--vt': `close-${pane.id}` } as CSSProperties}
+            style={{ "--vt": `close-${pane.id}` } as CSSProperties}
             onClick={onClose}
           >
             ×
           </button>
         </div>
 
-        <div className="pane-body" role="tabpanel" id={`${pane.id}-panel`} aria-labelledby={active.id} tabIndex={0}>
-          {renderTab(active)}
+        {/* Tab Content */}
+        <div
+          className="pane-body"
+          role="tabpanel"
+          id={`${pane.id}-panel`}
+          aria-labelledby={active.id}
+          tabIndex={0}
+        >
+          <TabBody key={active.id} tab={active} />
         </div>
 
-        {dropEdge && <div className={`pane-dock-preview is-${dropEdge}`} aria-hidden="true" />}
+        {/* Dock Preview (when dragging tabs into other tab bars, not dragging window) */}
+        {dropEdge && (
+          <div
+            className={`pane-dock-preview is-${dropEdge}`}
+            aria-hidden="true"
+          />
+        )}
       </section>
     </div>
-  )
+  );
 }

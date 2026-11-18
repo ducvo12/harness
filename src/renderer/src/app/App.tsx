@@ -6,7 +6,9 @@ import type { Agent, Conversation } from "../../../shared/agent";
 import type { Result, SavedConnection } from "../../../shared/chat";
 import type { Section, SectionMode } from "../../../shared/organization";
 import Header from "../components/header/Header";
-import Workspace, { type LayoutUpdate } from "../components/workspace/Workspace";
+import Workspace, {
+  type LayoutUpdate,
+} from "../components/workspace/Workspace";
 import {
   createPane,
   findPane,
@@ -24,16 +26,14 @@ import type {
   NewChatLocation,
   Tab,
 } from "../components/workspace/layout/tabs";
-import AgentExplorer, {
-  AgentPicker,
-} from "../components/workspace/explorer/AgentExplorer";
+import ExplorerTab, {
+  type ExplorerTabProps,
+} from "../components/workspace/explorer/ExplorerTab";
 import WorkspaceCreationDialog from "../features/organization/WorkspaceCreationDialog";
-import type { ReadingPosition } from "../components/workspace/content/chat/chatcomponents/Transcript";
-import ChatView from "../components/workspace/content/chat/ChatView";
+import type { ReadingPosition } from "../components/workspace/content/chat/transcript/Transcript";
 import Settings from "../features/connections/Settings";
-import MarkdownView, {
-  type FileDraft,
-} from "../components/workspace/content/markdown/MarkdownView";
+import type { FileDraft } from "../components/workspace/content/markdown/MarkdownView";
+import { TabBodyContext } from "../components/workspace/region/pane/TabBody";
 import {
   findTab,
   openDraftChat,
@@ -41,7 +41,7 @@ import {
   openWorkspaceFile,
   updateChatTab,
 } from "./saved-chat-layout";
-import { emptyChatDraft, useChatDrafts } from "./useChatDrafts";
+import { useChatDrafts } from "./useChatDrafts";
 import { useSavedResource } from "./useSavedResource";
 import { chatKey, useWorkspaceChats } from "./useWorkspaceChats";
 import {
@@ -468,146 +468,35 @@ export default function WorkspaceApp() {
     return result;
   }
 
-  function renderExplorer(agentId?: string, pickerId?: string) {
-    if (!agents)
-      return (
-        <p className="pane-message" role="status">
-          Loading agents…
-        </p>
-      );
-    if (!agents.ok)
-      return (
-        <div className="pane-message">
-          <p role="alert">{agents.error}</p>
-          <button type="button" onClick={retryAgents}>
-            Retry
-          </button>
-        </div>
-      );
-    const agent = agents.value.find((item) => item.id === agentId);
-    if (agent) {
-      const drafts = [...chatDrafts.drafts.values()].flatMap((draft) =>
-        draft.agentId === agent.id && draft.location
-          ? [
-              {
-                id: draft.id,
-                location: draft.location,
-                title:
-                  draft.text.trim().split("\n", 1)[0].slice(0, 64) ||
-                  draft.attachments[0]?.name ||
-                  "New chat",
-              },
-            ]
-          : [],
-      );
-      return (
-        <AgentExplorer
-          key={pickerId}
-          agent={agent}
-          revision={explorerRevisions.get(agent.id) ?? 0}
-          drafts={drafts}
-          onOpenDraft={openDraft}
-          onOpenFile={(path) => openFile({ agentId: agent.id, path })}
-          onOpenChat={openChat}
-          onNewChat={newChat}
-          onNewSection={() =>
-            setCreation({ kind: "section", agentId: agent.id })
-          }
-          onNewProject={(section) => setCreation({ kind: "project", section })}
-        />
-      );
-    }
+  const explorerProps: ExplorerTabProps = {
+    agents,
+    drafts: chatDrafts.drafts,
+    revisions: explorerRevisions,
+    onRetryAgents: retryAgents,
+    onChooseAgent: chooseAgent,
+    onNewAgent: (pickerId) => setCreation({ kind: "agent", pickerId }),
+    onOpenDraft: openDraft,
+    onOpenFile: openFile,
+    onOpenChat: openChat,
+    onNewChat: newChat,
+    onNewSection: (agentId) => setCreation({ kind: "section", agentId }),
+    onNewProject: (section) => setCreation({ kind: "project", section }),
+  };
 
-    return (
-      <AgentPicker
-        key={pickerId}
-        agents={agents.value}
-        onChoose={(chosen) => chooseAgent(chosen, pickerId)}
-        onNewAgent={() => setCreation({ kind: "agent", pickerId })}
-      />
-    );
-  }
-
-  function renderTab(tab: Tab) {
-    if (tab.type === "agent") return renderExplorer(tab.agentId, tab.id);
-    if (tab.type === "file" && tab.file && agents?.ok) {
-      const file = tab.file;
-      const agent = agents.value.find((item) => item.id === file.agentId);
-      if (agent)
-        return (
-          <MarkdownView
-            key={tab.id}
-            agent={agent}
-            path={file.path}
-            edit={{
-              draft: fileDrafts.get(tab.id),
-              setDraft: (draft) => updateFileDraft(tab.id, draft),
-            }}
-          />
-        );
-    }
-    if (tab.type === "chat" && tab.conversation) {
-      const conversation = tab.conversation;
-      const id = conversation.id ?? conversation.draftId;
-      const identity = { agentId: conversation.agentId, id };
-      const key = chatKey(identity);
-      const draft = chatDrafts.drafts.get(id) ?? emptyChatDraft;
-      const chat = chatSession.chats.get(key);
-      const agent = agents?.ok
-        ? agents.value.find((item) => item.id === conversation.agentId)
-        : undefined;
-      return (
-        <ChatView
-          key={tab.id}
-          conversationId={conversation.id}
-          agent={agent}
-          path={conversation.path}
-          chat={chat}
-          connections={connections}
-          selectedConnection={defaultConnection}
-          draft={draft}
-          draftId={id}
-          onDraftChange={(change) => chatDrafts.patch(conversation, change)}
-          onSelectConnection={selectConnection}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onRetryConnections={retryConnections}
-          onSubmit={(connection, model, effort, text, intent, images) =>
-            chatSession.submit(
-              identity,
-              connection,
-              model,
-              effort,
-              text,
-              intent,
-              intent === "message"
-                ? {
-                    messageId: chatDrafts.get(id)?.pendingId,
-                    location: conversation.location,
-                    images,
-                    started: (pendingId) => {
-                      chatDrafts.patch(conversation, { pendingId });
-                      chatDrafts.checkpoint();
-                    },
-                    accepted: (saved) => {
-                      chatDrafts.clear(id);
-                      showSavedChat(saved);
-                    },
-                  }
-                : undefined,
-            )
-          }
-          onError={(error) => chatSession.setError(key, error)}
-          onReload={() => {
-            if (conversation.id !== undefined)
-              chatSession.load(conversation, true);
-          }}
-          readPosition={() => positions.current.get(tab.id)}
-          savePosition={(position) => positions.current.set(tab.id, position)}
-        />
-      );
-    }
-    return null;
-  }
+  const tabBodyState = {
+    explorerProps,
+    fileDrafts,
+    updateFileDraft,
+    chatDrafts,
+    chatSession,
+    connections,
+    selectedConnection: defaultConnection,
+    selectConnection,
+    openSettings: () => setSettingsOpen(true),
+    retryConnections,
+    showSavedChat,
+    positions,
+  };
 
   return (
     <div
@@ -631,22 +520,24 @@ export default function WorkspaceApp() {
       {windowError && <p role="alert">{windowError}</p>}
       {chatDrafts.error && <p role="alert">{chatDrafts.error}</p>}
 
-      <Workspace
-        layout={layout}
-        renderTab={renderTab}
-        renderEmptyRegion={(type) =>
-          type === "explorer" ? (
-            renderExplorer()
-          ) : (
-            <p>Open a file or chat from Explorer.</p>
-          )
-        }
-        tabCloseReason={fileCloseReason}
-        onLayoutChange={changeLayout}
-        onBoundsChange={setBounds}
-        newPane={nextGroup(state)}
-        workspaceRef={workspace}
-      />
+      {/* Workspace */}
+      <TabBodyContext value={tabBodyState}>
+        <Workspace
+          layout={layout}
+          renderEmptyRegion={(type) =>
+            type === "explorer" ? (
+              <ExplorerTab {...explorerProps} />
+            ) : (
+              <p>Open a file or chat from Explorer.</p>
+            )
+          }
+          tabCloseReason={fileCloseReason}
+          onLayoutChange={changeLayout}
+          onBoundsChange={setBounds}
+          newPane={nextGroup(state)}
+          workspaceRef={workspace}
+        />
+      </TabBodyContext>
 
       {/* Creation menu */}
       {creation && (

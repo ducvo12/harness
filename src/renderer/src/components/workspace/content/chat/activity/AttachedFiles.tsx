@@ -1,6 +1,6 @@
 import ActivitySection from './ActivitySection'
 import type { AgentMessage } from '../../../../../../../shared/agent'
-import { sentAttachments } from './attachments'
+import { sentAttachments } from '../attachments'
 
 export default function AttachedFiles({ messages }: { messages: AgentMessage[] }) {
   const sent = messages.filter(message => message.role === 'user').flatMap(message => [

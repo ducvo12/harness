@@ -1,6 +1,6 @@
-import { imageDataLimit, imageTypes, type MessageImage } from '../../../../../../../shared/message-images.ts'
-import { attachmentSourceLimit, type AttachmentFormat } from '../../../../../../../shared/attachment-conversion.ts'
-import { attachmentTextLimit, messageTextLimit } from '../../../../../../../shared/chat-limits.ts'
+import { imageDataLimit, imageTypes, type MessageImage } from '../../../../../../shared/message-images.ts'
+import { attachmentSourceLimit, type AttachmentFormat } from '../../../../../../shared/attachment-conversion.ts'
+import { attachmentTextLimit, messageTextLimit } from '../../../../../../shared/chat-limits.ts'
 
 export interface ChatAttachment {
   id: string
