@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## Commit Rule
+
+Follow this rule for all commits unless I explicitly tell you otherwise.
+
+- When I ask you to commit, create the commit that encorporates the change we are currently working on.
+- Use standard commit format
+- Never push without my permission.
+- Never create pull requests without my permission.
+
 ## Think Before Coding
 
 Do not assume, hide confusion, or skip tradeoffs.
