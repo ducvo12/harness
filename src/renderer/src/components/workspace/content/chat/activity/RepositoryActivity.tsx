@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { RepositoryReport } from '../../../../../../../shared/repository'
-import type { RunSnapshot } from '../../../../../../../shared/run'
+import { isLiveRun, type RunSnapshot } from '../../../../../../../shared/run'
 import ActivitySection from './ActivitySection'
 import RepositoryChanges from './RepositoryChanges'
 import { activitySummary } from './activity-summary'
@@ -12,16 +12,16 @@ const publicationLabels = {
   discarded: 'Changes discarded'
 }
 
-export default function RepositoryActivity({ agentId, conversationId, busy, stopping, run, onStop, children }: {
+export default function RepositoryActivity({ agentId, conversationId, run, onStop, children }: {
   agentId: string
   conversationId: string
-  busy: boolean
-  stopping: boolean
   run?: RunSnapshot
   onStop: () => Promise<void>
   children?: ReactNode
 }) {
   const runId = run?.id
+  const busy = Boolean(run && isLiveRun(run))
+  const stopping = run?.phase === 'stopping'
   const [reports, setReports] = useState<RepositoryReport[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(Boolean(conversationId))

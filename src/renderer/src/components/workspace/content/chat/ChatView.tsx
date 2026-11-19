@@ -7,7 +7,7 @@ import ActivityPanel from "./activity/ActivityPanel";
 import ApprovalPrompt from "./run/ApprovalPrompt";
 import Composer from "./composer/Composer";
 import QuestionPrompt from "./run/QuestionPrompt";
-import RunControls, { runLabel } from "./run/RunControls";
+import RunControls from "./run/RunControls";
 import Transcript, { type ReadingPosition } from "./transcript/Transcript";
 import {
   imagesFromAttachments,
@@ -179,7 +179,6 @@ export default function ChatView({
           conversationId={conversationId}
           loaded={loaded}
           messages={messages}
-          busy={busy}
           run={run}
           onStop={stop}
         />
@@ -293,12 +292,9 @@ export default function ChatView({
             attachments={draft.attachments}
             attachmentPicker={attachmentPicker}
             onAttachmentsChange={changeAttachments}
-            busy={busy}
             loaded={loaded}
             submitting={submitting}
-            stopping={run?.phase === "stopping"}
             run={run}
-            progress={run ? runLabel(run) : ""}
             onSelectConnection={onSelectConnection}
             onOpenSettings={onOpenSettings}
             onDraftChange={(text) => onDraftChange({ text })}

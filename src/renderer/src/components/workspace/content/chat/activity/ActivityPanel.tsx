@@ -9,12 +9,11 @@ interface ActivityPanelProps {
   conversationId?: string
   loaded: boolean
   messages: AgentMessage[]
-  busy: boolean
   run?: RunSnapshot
   onStop: () => Promise<void>
 }
 
-export default function ActivityPanel({ agentId, conversationId, loaded, messages, busy, run, onStop }: ActivityPanelProps) {
+export default function ActivityPanel({ agentId, conversationId, loaded, messages, run, onStop }: ActivityPanelProps) {
   const [open, setOpen] = useState(false)
   const panelId = useId()
   const toggle = useRef<HTMLButtonElement>(null)
@@ -36,7 +35,7 @@ export default function ActivityPanel({ agentId, conversationId, loaded, message
 
       <aside id={panelId} className="workspace-activity-panel" aria-label="Chat activity">
         <RepositoryActivity key={JSON.stringify([agentId, conversationId])} agentId={agentId}
-          conversationId={conversationId} busy={busy} stopping={run?.phase === 'stopping'} run={run} onStop={onStop}>
+          conversationId={conversationId} run={run} onStop={onStop}>
           <AttachedFiles messages={messages} />
         </RepositoryActivity>
       </aside>

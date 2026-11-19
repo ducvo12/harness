@@ -1,8 +1,9 @@
 import { useRef } from 'react'
 import type { Agent, AgentMessage } from '../../../../../../../shared/agent'
 import type { SavedConnection } from '../../../../../../../shared/chat'
-import type { RunSnapshot } from '../../../../../../../shared/run'
+import { isLiveRun, type RunSnapshot } from '../../../../../../../shared/run'
 import { attachmentAccept, type ChatAttachment } from '../attachments'
+import { runLabel } from '../run/RunControls'
 import ChatModelPicker from './ChatModelPicker'
 import ContextIndicator from './ContextIndicator'
 import { latestContextResponse } from './context-display'
@@ -19,12 +20,9 @@ interface ComposerProps {
   attachments: ChatAttachment[]
   attachmentPicker: ReturnType<typeof useAttachmentPicker>
   onAttachmentsChange: (files: ChatAttachment[]) => void
-  busy: boolean
   loaded: boolean
   submitting: boolean
-  stopping: boolean
   run?: RunSnapshot
-  progress: string
   onSelectConnection: (id: string) => void
   onOpenSettings: () => void
   onDraftChange: (draft: string) => void
@@ -34,13 +32,15 @@ interface ComposerProps {
 
 export default function Composer({
   agent, connections, connection, modelSelection, messages, draft, attachments, attachmentPicker,
-  busy, loaded, submitting, stopping, run, progress,
+  loaded, submitting, run,
   onSelectConnection, onOpenSettings, onDraftChange, onAttachmentsChange, onSend, onStop
 }: ComposerProps) {
   const contextResponse = latestContextResponse(messages, modelSelection.model)
   const fileInput = useRef<HTMLInputElement>(null)
   const attachmentDisabled = !agent || !loaded || submitting || attachmentPicker.reading
-  const status = busy ? progress : 'Enter to send · Shift + Enter for a new line'
+  const busy = Boolean(run && isLiveRun(run))
+  const stopping = run?.phase === 'stopping'
+  const status = run && busy ? runLabel(run) : 'Enter to send · Shift + Enter for a new line'
 
   return (
     <form
