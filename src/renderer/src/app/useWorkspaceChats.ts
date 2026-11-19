@@ -12,6 +12,14 @@ export interface ChatIdentity {
   id: string
 }
 
+export interface RunRequest {
+  connection: SavedConnection | undefined
+  model: string
+  effort: string
+  text: string
+  intent: RunIntent
+}
+
 interface MessageSubmission {
   images?: MessageImage[]
   messageId?: string
@@ -181,15 +189,8 @@ export function useWorkspaceChats() {
       : { ...chat, run })
   }
 
-  async function submit(
-    identity: ChatIdentity,
-    connection: SavedConnection | undefined,
-    model: string,
-    effort: string,
-    text: string,
-    intent: RunIntent,
-    message?: MessageSubmission
-  ) {
+  async function submit(identity: ChatIdentity, request: RunRequest, message?: MessageSubmission) {
+    const { connection, model, effort, text, intent } = request
     const key = chatKey(identity)
     if (submissions.current.has(key)) return
     const requestId = crypto.randomUUID()

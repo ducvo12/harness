@@ -110,15 +110,11 @@ export default function TabBody({ tab }: { tab: Tab }) {
         onSelectConnection={selectConnection}
         onOpenSettings={openSettings}
         onRetryConnections={retryConnections}
-        onSubmit={(connection, model, effort, text, intent, images) =>
+        onSubmit={(request, images) =>
           chatSession.submit(
             identity,
-            connection,
-            model,
-            effort,
-            text,
-            intent,
-            intent === "message"
+            request,
+            request.intent === "message"
               ? {
                   messageId: chatDrafts.get(id)?.pendingId,
                   location: conversation.location,

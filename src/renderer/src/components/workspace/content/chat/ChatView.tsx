@@ -2,7 +2,7 @@ import type { MessageImage } from "../../../../../../shared/message-images";
 import type { Agent, AgentMessage } from "../../../../../../shared/agent";
 import { bridgeError, type Result, type SavedConnection } from "../../../../../../shared/chat";
 import { isLiveRun, type RunIntent } from "../../../../../../shared/run";
-import type { WorkspaceChatState } from "../../../../app/useWorkspaceChats";
+import type { RunRequest, WorkspaceChatState } from "../../../../app/useWorkspaceChats";
 import ActivityPanel from "./activity/ActivityPanel";
 import ApprovalPrompt from "./run/ApprovalPrompt";
 import Composer from "./composer/Composer";
@@ -38,14 +38,7 @@ interface ChatViewProps {
   onSelectConnection: (id: string) => void;
   onOpenSettings: () => void;
   onRetryConnections: () => void;
-  onSubmit: (
-    connection: SavedConnection | undefined,
-    model: string,
-    effort: string,
-    text: string,
-    intent: RunIntent,
-    images?: MessageImage[],
-  ) => Promise<void>;
+  onSubmit: (request: RunRequest, images?: MessageImage[]) => Promise<void>;
   onError: (error: string) => void;
   onReload: () => void;
   readPosition: () => ReadingPosition | undefined;
@@ -127,11 +120,13 @@ export default function ChatView({
       return;
     }
     await onSubmit(
-      available,
-      modelSelection.model,
-      modelSelection.effort,
-      text,
-      intent,
+      {
+        connection: available,
+        model: modelSelection.model,
+        effort: modelSelection.effort,
+        text,
+        intent,
+      },
       intent === "message"
         ? imagesFromAttachments(draft.attachments)
         : undefined,
