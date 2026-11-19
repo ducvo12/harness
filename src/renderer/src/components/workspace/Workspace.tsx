@@ -35,6 +35,7 @@ import {
 import { paneTypes, type PaneType } from "./layout/pane-types";
 import {
   regionGap,
+  regionLayout,
   regionMinimum,
   regionSwapAt,
   resizeRegions,
@@ -484,9 +485,9 @@ export default function Workspace({
   ) {
     cancelInteraction();
     onLayoutChange((current) => {
-      const region = current.regions.find((item) => item.type === type);
-      return region?.layout
-        ? updateRegion(current, type, updatePane(region.layout, id, update))
+      const groups = regionLayout(current, type);
+      return groups
+        ? updateRegion(current, type, updatePane(groups, id, update))
         : current;
     });
   }
@@ -523,9 +524,7 @@ export default function Workspace({
         runScopedTransition(workspace.current, "groups", () => {
           cancelInteraction();
           onLayoutChange((current) => {
-            const groups = current.regions.find(
-              (item) => item.type === region,
-            )?.layout;
+            const groups = regionLayout(current, region);
             return groups
               ? updateRegion(current, region, removePane(groups, node.id))
               : current;

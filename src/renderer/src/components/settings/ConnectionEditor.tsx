@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import type { ConnectionDraft, SavedConnection } from '../../../../shared/chat'
+import { bridgeError, type ConnectionDraft, type SavedConnection } from '../../../../shared/chat'
 import ApiConnectionEditor from './api/ApiConnectionEditor'
 import ChatGPTConnectionEditor from './chatgpt/ChatGPTConnectionEditor'
 import type { ProviderPreset } from './presets'
@@ -41,8 +41,6 @@ function initialDraft(selection: ConnectionSelection): ConnectionDraft {
     ...(preset.provider === 'chatgpt' ? { accountId: '', effort: '' } : {})
   }
 }
-
-const bridgeError = 'Could not communicate with the desktop backend.'
 
 export default function ConnectionEditor({ connections, selection, onSave, onClose }: Props) {
   const [editing, setEditing] = useState(() => initialDraft(selection))

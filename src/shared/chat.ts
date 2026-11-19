@@ -7,6 +7,8 @@ import type { RecoveryNotice, RunIntent, RunSnapshot } from './run'
 import type { RepositoryEditorChoices } from './repository-editor'
 import type { ConnectionUsage, RateLimitWindow } from './connection-usage'
 
+export const bridgeError = 'Could not communicate with the desktop backend.'
+
 export interface Connection {
   contextWindow?: number
   maxOutputTokens?: number

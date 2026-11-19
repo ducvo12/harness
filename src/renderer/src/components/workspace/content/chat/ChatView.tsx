@@ -1,6 +1,6 @@
 import type { MessageImage } from "../../../../../../shared/message-images";
 import type { Agent, AgentMessage } from "../../../../../../shared/agent";
-import type { Result, SavedConnection } from "../../../../../../shared/chat";
+import { bridgeError, type Result, type SavedConnection } from "../../../../../../shared/chat";
 import { isLiveRun, type RunIntent } from "../../../../../../shared/run";
 import type { WorkspaceChatState } from "../../../../app/useWorkspaceChats";
 import ActivityPanel from "./activity/ActivityPanel";
@@ -146,7 +146,7 @@ export default function ChatView({
       if (outcome.ok) return true;
       onError(outcome.error);
     } catch {
-      onError("Could not communicate with the desktop backend.");
+      onError(bridgeError);
     }
     return false;
   }

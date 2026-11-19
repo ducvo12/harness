@@ -55,6 +55,11 @@ export function swapRegions(layout: RegionLayout): RegionLayout {
   return { regions: [layout.regions[1], layout.regions[0]], ratio: 1 - layout.ratio }
 }
 
+// Both region types are always present; loading rejects layouts that lack one.
+export function regionLayout(layout: RegionLayout, type: PaneType): Layout | null {
+  return layout.regions.find(region => region.type === type)!.layout
+}
+
 // Commit one family's group tree without accepting groups owned by another region.
 export function updateRegion(layout: RegionLayout, type: PaneType, groups: Layout | null): RegionLayout {
   if (groups && !isPaneType(groups, type)) return layout

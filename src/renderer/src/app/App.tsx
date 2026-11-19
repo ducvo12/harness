@@ -12,19 +12,22 @@ import Workspace, {
 import {
   createPane,
   findPane,
+  findTab,
   updatePane,
   type Rect,
 } from "../components/workspace/layout/layout";
 import {
+  regionLayout,
   regionsMinimum,
   updateRegion,
   type RegionLayout,
 } from "../components/workspace/layout/regions";
-import type {
-  DraftChatDestination,
-  FileDestination,
-  NewChatLocation,
-  Tab,
+import {
+  chatId,
+  type DraftChatDestination,
+  type FileDestination,
+  type NewChatLocation,
+  type Tab,
 } from "../components/workspace/layout/tabs";
 import ExplorerTab, {
   type ExplorerTabProps,
@@ -35,7 +38,6 @@ import Settings from "../components/settings/Settings";
 import type { FileDraft } from "../components/workspace/content/markdown/MarkdownView";
 import { TabBodyContext } from "../components/workspace/region/pane/TabBody";
 import {
-  findTab,
   openDraftChat,
   openSavedChat,
   openWorkspaceFile,
@@ -266,9 +268,7 @@ export default function WorkspaceApp() {
   }, [layout]);
 
   useEffect(() => {
-    const content = layout.regions.find(
-      (region) => region.type === "content",
-    )!.layout;
+    const content = regionLayout(layout, "content");
     for (const viewId of positions.current.keys()) {
       if (!findTab(content, (tab) => tab.id === viewId))
         positions.current.delete(viewId);
@@ -282,9 +282,7 @@ export default function WorkspaceApp() {
   }, [layout]);
 
   useEffect(() => {
-    const content = layout.regions.find(
-      (region) => region.type === "content",
-    )!.layout;
+    const content = regionLayout(layout, "content");
     chatSession.prune((key) =>
       Boolean(
         findTab(
@@ -294,7 +292,7 @@ export default function WorkspaceApp() {
             tab.conversation !== undefined &&
             chatKey({
               agentId: tab.conversation.agentId,
-              id: tab.conversation.id ?? tab.conversation.draftId,
+              id: chatId(tab.conversation),
             }) === key,
         ),
       ),
@@ -388,7 +386,7 @@ export default function WorkspaceApp() {
         updateChatTab(
           current.layout,
           (tab) =>
-            (tab.conversation?.id ?? tab.conversation?.draftId) === saved.id,
+            tab.conversation !== undefined && chatId(tab.conversation) === saved.id,
           (tab) => ({
             ...tab,
             title: saved.title,
@@ -406,9 +404,7 @@ export default function WorkspaceApp() {
 
   function chooseAgent(agent: Agent, pickerId?: string) {
     setState((current) => {
-      const explorer = current.layout.regions.find(
-        (region) => region.type === "explorer",
-      )!.layout;
+      const explorer = regionLayout(current.layout, "explorer");
       const entry = {
         type: "agent" as const,
         agentId: agent.id,

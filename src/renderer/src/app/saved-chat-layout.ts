@@ -1,14 +1,7 @@
 import type { Conversation } from '../../../shared/agent.ts'
-import { createPane, updatePane, type Layout, type PaneNode } from '../components/workspace/layout/layout.ts'
-import { updateRegion, type RegionLayout } from '../components/workspace/layout/regions.ts'
+import { createPane, findTab, updatePane, type PaneNode } from '../components/workspace/layout/layout.ts'
+import { regionLayout, updateRegion, type RegionLayout } from '../components/workspace/layout/regions.ts'
 import { addTab, selectTab, type DraftChatDestination, type FileDestination, type NewTab, type Tab } from '../components/workspace/layout/tabs.ts'
-
-export function findTab(layout: Layout | null, matches: (tab: Tab) => boolean): { pane: PaneNode; tab: Tab } | undefined {
-  if (!layout) return
-  if (layout.kind === 'split') return findTab(layout.first, matches) ?? findTab(layout.second, matches)
-  const tab = layout.tabs.find(matches)
-  if (tab) return { pane: layout, tab }
-}
 
 export function openSavedChat(layout: RegionLayout, identity: Pick<PaneNode, 'id' | 'title'>, chat: Conversation, path: string[]) {
   return openContentTab(layout, identity,
@@ -30,7 +23,7 @@ function openContentTab(
   tab: Extract<NewTab, { type: 'chat' | 'file' }>,
   matches: (tab: Tab) => boolean
 ) {
-  const content = layout.regions.find(region => region.type === 'content')!.layout
+  const content = regionLayout(layout, 'content')
   const existing = findTab(content, matches)
   if (existing && content) {
     const selected = updatePane(content, existing.pane.id, pane => selectTab(pane, existing.tab.id))
@@ -47,7 +40,7 @@ export function openDraftChat(layout: RegionLayout, identity: Pick<PaneNode, 'id
 }
 
 function addContentTab(layout: RegionLayout, identity: Pick<PaneNode, 'id' | 'title'>, tab: NewTab) {
-  const content = layout.regions.find(region => region.type === 'content')!.layout
+  const content = regionLayout(layout, 'content')
   let target = content
   while (target?.kind === 'split') target = target.first
   if (!target || !content) {
@@ -67,7 +60,7 @@ export function updateChatTab(
   matches: (tab: Extract<Tab, { type: 'chat' }>) => boolean,
   update: (tab: Extract<Tab, { type: 'chat' }>) => Extract<Tab, { type: 'chat' }>
 ) {
-  const content = layout.regions.find(region => region.type === 'content')!.layout
+  const content = regionLayout(layout, 'content')
   if (!content) return layout
   const found = findTab(content, tab => tab.type === 'chat' && matches(tab))
   if (!found) return layout

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MessageImage } from '../../../shared/message-images'
 import type { AgentMessage, ConversationDetail } from '../../../shared/agent'
-import type { Result, SavedConnection } from '../../../shared/chat'
+import { bridgeError, type Result, type SavedConnection } from '../../../shared/chat'
 import type { ConversationLocation } from '../../../shared/organization'
 import type { ApprovalRequest } from '../../../shared/harness'
 import { isLiveRun, type RunIntent, type RunSnapshot } from '../../../shared/run'
@@ -46,8 +46,6 @@ function currentRun(records: Iterable<RunSnapshot>, key: string) {
   }
   return latest
 }
-
-const bridgeError = 'Could not communicate with the desktop backend.'
 
 export function useWorkspaceChats() {
   const [chats, setChats] = useState(new Map<string, WorkspaceChatState>())

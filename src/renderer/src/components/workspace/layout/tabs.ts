@@ -6,6 +6,11 @@ export type NewChatLocation = ChatPath & { location: ConversationLocation }
 export type DraftChatDestination = NewChatLocation & { id?: never; draftId: string }
 export type ChatDestination = (ChatPath & { id: string; location?: never; draftId?: never }) | DraftChatDestination
 
+// Saved chats are identified by id, unsaved ones by their draft id.
+export function chatId(destination: ChatDestination) {
+  return destination.id ?? destination.draftId
+}
+
 export type FileDestination = { agentId: string; path: string }
 
 export type Tab = { id: string; title: string } & (

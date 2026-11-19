@@ -2,6 +2,7 @@ import DropdownMenu, { DropdownMenuOption } from '../../controls/DropdownMenu'
 import { useEffect, useState, type FormEvent, type RefObject } from 'react'
 import type { ConnectionDraft, SavedConnection } from '../../../../../shared/chat'
 import type { ChatGPTAccount } from '../../../../../shared/harness'
+import { isChatGPTProvider } from '../presets'
 
 type Props = {
   connections: SavedConnection[]
@@ -79,7 +80,7 @@ export default function ChatGPTConnectionEditor({
         item =>
           item.id !== editing.id &&
           item.accountId === result.value.id &&
-          (item.provider === 'chatgpt' || item.provider === 'codex')
+          isChatGPTProvider(item.provider)
       )
       if (duplicate) {
         setError(`This account is already connected as “${duplicate.name}”. Sign in with a different account.`)

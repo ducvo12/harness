@@ -1,5 +1,11 @@
 import { acceptsTab, type PaneType } from "./pane-types.ts";
-import { closeTab, initialTabs, type NewTab, type PaneTabs } from "./tabs.ts";
+import {
+  closeTab,
+  initialTabs,
+  type NewTab,
+  type PaneTabs,
+  type Tab,
+} from "./tabs.ts";
 
 export type Edge = "left" | "right" | "top" | "bottom";
 
@@ -44,10 +50,29 @@ export function createPane(
   return { kind: "pane", id, title, ...initialTabs(id, paneType, entry) };
 }
 
+// Visit every pane in display order; all tree searches go through this walk.
+export function* panes(layout: Layout | null): Generator<PaneNode> {
+  if (!layout) return;
+  if (layout.kind === "pane") yield layout;
+  else {
+    yield* panes(layout.first);
+    yield* panes(layout.second);
+  }
+}
+
 // Find a pane in either branch without depending on its position in the layout.
 export function findPane(layout: Layout, id: string): PaneNode | undefined {
-  if (layout.kind === "pane") return layout.id === id ? layout : undefined;
-  return findPane(layout.first, id) ?? findPane(layout.second, id);
+  for (const pane of panes(layout)) if (pane.id === id) return pane;
+}
+
+export function findTab(
+  layout: Layout | null,
+  matches: (tab: Tab) => boolean,
+): { pane: PaneNode; tab: Tab } | undefined {
+  for (const pane of panes(layout)) {
+    const tab = pane.tabs.find(matches);
+    if (tab) return { pane, tab };
+  }
 }
 
 // Update a pane without losing its tabs when it moves between split branches.

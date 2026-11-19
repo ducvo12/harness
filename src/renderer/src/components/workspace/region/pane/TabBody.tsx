@@ -15,7 +15,7 @@ import MarkdownView, {
   type FileDraft,
 } from "../../content/markdown/MarkdownView";
 import ExplorerTab, { type ExplorerTabProps } from "../../explorer/ExplorerTab";
-import type { Tab } from "../../layout/tabs";
+import { chatId, type Tab } from "../../layout/tabs";
 
 interface TabBodyState {
   explorerProps: ExplorerTabProps;
@@ -88,7 +88,7 @@ export default function TabBody({ tab }: { tab: Tab }) {
     const conversation = tab.conversation;
     if (!conversation) return null;
 
-    const id = conversation.id ?? conversation.draftId;
+    const id = chatId(conversation);
     const identity = { agentId: conversation.agentId, id };
     const key = chatKey(identity);
     const draft = chatDrafts.drafts.get(id) ?? emptyChatDraft;

@@ -92,6 +92,11 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   }
 ]
 
+// 'codex' is the older saved name for the ChatGPT provider.
+export function isChatGPTProvider(provider?: string) {
+  return provider === 'chatgpt' || provider === 'codex'
+}
+
 export function findPresetForConnection(connection?: {
   provider?: string
   baseUrl?: string
@@ -99,7 +104,7 @@ export function findPresetForConnection(connection?: {
   if (!connection) {
     return PROVIDER_PRESETS[PROVIDER_PRESETS.length - 1]
   }
-  if (connection.provider === 'chatgpt' || connection.provider === 'codex') {
+  if (isChatGPTProvider(connection.provider)) {
     return PROVIDER_PRESETS[0]
   }
   const cleanUrl = (connection.baseUrl || '').trim().replace(/\/+$/, '')

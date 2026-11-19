@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { z } from 'zod/mini'
 import type { Agent, ConversationDetail } from '../../../shared/agent'
-import type { ChatDestination } from '../components/workspace/layout/tabs'
+import { chatId, type ChatDestination } from '../components/workspace/layout/tabs'
 import type { ComposerDraft } from '../components/workspace/content/chat/ChatView'
 
 const storageKey = 'granite.workspace.chat-drafts'
@@ -59,7 +59,7 @@ export function useChatDrafts() {
   }
 
   function patch(destination: ChatDestination, change: Partial<ComposerDraft> & { pendingId?: string }) {
-    const id = destination.id ?? destination.draftId
+    const id = chatId(destination)
     const prior = latest.current.get(id)
     const draft: ChatDraft = {
       ...(prior ?? emptyChatDraft), id, agentId: destination.agentId, location: destination.location,

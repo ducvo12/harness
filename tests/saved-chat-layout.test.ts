@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { Conversation } from '../src/shared/agent.ts'
-import { findTab, openSavedChat } from '../src/renderer/src/app/saved-chat-layout.ts'
-import { dockTab, removePane, type Layout } from '../src/renderer/src/components/workspace/layout/layout.ts'
-import { initialRegions, updateRegion, type RegionLayout } from '../src/renderer/src/components/workspace/layout/regions.ts'
+import { openSavedChat } from '../src/renderer/src/app/saved-chat-layout.ts'
+import { dockTab, findTab, removePane, type Layout } from '../src/renderer/src/components/workspace/layout/layout.ts'
+import { initialRegions, regionLayout, updateRegion, type RegionLayout } from '../src/renderer/src/components/workspace/layout/regions.ts'
 
 const chat: Conversation = {
   id: 'saved', agentId: 'atlas', title: 'Saved chat', sectionId: 'general', projectId: null,
@@ -12,7 +12,7 @@ const chat: Conversation = {
 const group = { id: 'pane-2', title: 'Group 2' }
 
 function content(layout: RegionLayout): Layout {
-  const groups = layout.regions.find(region => region.type === 'content')!.layout
+  const groups = regionLayout(layout, 'content')
   assert.ok(groups)
   return groups
 }

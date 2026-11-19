@@ -2,7 +2,7 @@ import { z } from 'zod/mini'
 import type { Agent } from '../../../shared/agent.ts'
 import type { GraniteBridge } from '../../../shared/chat.ts'
 import { isWorkspaceMarkdown } from '../../../shared/workspace-markdown.ts'
-import type { Layout, PaneNode } from '../components/workspace/layout/layout.ts'
+import { panes, type Layout } from '../components/workspace/layout/layout.ts'
 import { acceptsTab } from '../components/workspace/layout/pane-types.ts'
 import { initialRegions, updateRegion, type RegionLayout } from '../components/workspace/layout/regions.ts'
 import type { Tab } from '../components/workspace/layout/tabs.ts'
@@ -64,15 +64,6 @@ const snapshot = z.object({
   layout: z.object({ regions: z.tuple([region, region]), ratio }),
   nextPane: counter
 })
-
-function* panes(node: Layout | null): Generator<PaneNode> {
-  if (!node) return
-  if (node.kind === 'pane') yield node
-  else {
-    yield* panes(node.first)
-    yield* panes(node.second)
-  }
-}
 
 export function workspacePanes(layout: RegionLayout) {
   return layout.regions.flatMap(region => [...panes(region.layout)])

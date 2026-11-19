@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { SavedConnection } from '../../../../shared/chat'
-import { PROVIDER_PRESETS, findPresetForConnection, type ProviderPreset } from './presets'
+import { bridgeError, type SavedConnection } from '../../../../shared/chat'
+import { PROVIDER_PRESETS, findPresetForConnection, isChatGPTProvider, type ProviderPreset } from './presets'
 
 function OpenAIIcon({ size = 18 }: { size?: number }) {
   return (
@@ -78,8 +78,6 @@ type Props = {
   onEdit: (connection: SavedConnection) => void
   onConnect: (preset: ProviderPreset) => void
 }
-
-const bridgeError = 'Could not communicate with the desktop backend.'
 
 export default function ConnectionList({
   connections,
@@ -162,7 +160,7 @@ export default function ConnectionList({
             ) : (
               connections.map(item => {
                 const preset = findPresetForConnection(item)
-                const isChatGPT = item.provider === 'chatgpt' || item.provider === 'codex'
+                const isChatGPT = isChatGPTProvider(item.provider)
                 const isCustom = !preset.hideEndpoint
 
                 return (
