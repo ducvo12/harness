@@ -1,6 +1,6 @@
 # Pass 3A.1 Implementation & Testing
 
-> Dated verification record. Counts, environments and limitations below describe their recorded checkpoints. For current behavior use [the harness guide](../../harness.md); for delivery status use [[Start Here]]. Temporary evidence paths may no longer exist.
+> Dated verification record. Counts, environments and limitations below describe their recorded checkpoints. For current behavior use [the harness guide](../../../../harness.md); for delivery status use [[Start Here]]. Temporary evidence paths may no longer exist.
 
 > Implemented and verified October 26, 2026. This is the first of the two passes selected by the user in D-069. The interactive command/filesystem foundation works, including real supplied-command Vite and Next.js installs and production builds. **Full autonomous project setup remains incomplete:** question/answer UI, bounded workflow/retry grants, managed preview lifetimes and real-model acceptance belong to 3A.2.
 

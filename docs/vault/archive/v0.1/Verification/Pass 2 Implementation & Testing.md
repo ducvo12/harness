@@ -1,6 +1,6 @@
 # Pass 2 Implementation & Testing
 
-> Dated verification record. Counts, environments and limitations below describe their recorded checkpoints. For current behavior use [the harness guide](../../harness.md); for delivery status use [[Start Here]]. Temporary evidence paths may no longer exist.
+> Dated verification record. Counts, environments and limitations below describe their recorded checkpoints. For current behavior use [the harness guide](../../../../harness.md); for delivery status use [[Start Here]]. Temporary evidence paths may no longer exist.
 
 > Implemented October 25, 2026, with light verification requested by the user. The build, focused checks and a disposable desktop smoke check pass. Broader behavior and live-provider testing remain pending; this is not completion of passes 3–6.
 

@@ -1,6 +1,6 @@
 # Granite desktop development
 
-> Current development guide, reviewed November 2, 2026. [Harness behavior](harness.md) describes delivered features; [the planning vault](<vault/Start Here.md>) separates remaining work and verification.
+> Current development guide, reviewed November 18, 2026. [Harness behavior](harness.md) describes delivered features; [the planning vault](<vault/Start Here.md>) separates remaining work and verification.
 
 ## Run and package
 
@@ -39,85 +39,58 @@ fail instead of being silently ignored.
 
 ## Saved-chat workspace
 
-Open the workspace with `npm run dev` or run `npm run preview` after building.
+The workspace is the app's only shell. Open it with `npm run dev`, or run
+`npm run preview` after building. The earlier shell was removed on November 17.
 
-### Confirmed on rebuild
+### Layout
 
 - Explorer and Content are side-by-side regions that can swap places and keep
   their widths and split layouts. Their groups resize and split within their
   own region. Tabs merge or reorder at the tab strip and split on body drops.
   Dragging moves the existing view and preserves its identity.
+- The layout is app-wide. It restores region order and widths, pane splits, and
+  open saved views on launch. Layout logic lives in
+  `components/workspace/layout/`.
+
+### Chats
+
 - Explorer opens chats in Content and focuses an existing view when one is open.
   The view owns scrolling and drafts. A conversation owns messages and runs,
-  and closing its tab leaves the run active. If duplicate views are introduced,
-  Explorer should focus the most recently used one. The duplicate-view gesture
-  and draft recovery rules remain open.
-- The planned layout is app-wide. The full interaction rules and original
-  decisions are in `docs/development.md` and `docs/rebuild-branch-record.md`
-  on `rebuild`. The port uses the pane behavior at `7669e61`.
+  and closing its tab leaves the run active. Reopening a chat creates a fresh
+  view at the latest message and shows the current reply. Separate chats can be
+  viewed side by side, and the visible message and scroll offset survive tab
+  switches, splits and merges. The duplicate-view gesture and draft recovery
+  rules remain open. If duplicate views are introduced, Explorer should focus
+  the most recently used one.
+- Saved chats use the shared composer. They can send messages, display live
+  replies, stop runs, and answer agent questions above the message box. The
+  composer accepts images and text files, and chat activity (repository
+  changes, commands, attached files) shows in the activity panel.
+- **New chat** in Explorer opens a draft in the selected agent's General
+  section. Section and project controls open drafts at their own locations.
+  The first send saves the chat and its outgoing message together, before the
+  provider is contacted. A connection or model failure leaves the message in
+  the transcript. Closing an unsent tab leaves a draft in Explorer without
+  creating a conversation.
+- Chat drafts and text attachments save when switching or closing tabs and on
+  normal quit, and restore when the chat reopens. Deleting a chat removes its
+  draft. A crash can lose edits since the last save. Markdown drafts are
+  session-only.
 
-### Completed on connect-explorer
-
-- `f7e1a93` ports the opt-in workspace shell, pane controls, and native window
-  sizing onto `main`, alongside its existing agent worker and SQLite storage.
-- `0c73c91` connects agent tabs in Explorer to saved sections, projects, and
-  chats. Clicking a chat opens its read-only transcript in Content with its
-  agent and location. Clicking it again selects and focuses the same tab,
-  including after docking. Separate chats can be viewed side by side.
-- The workspace keeps the visible message and scroll offset per tab through
-  tab switches, splits, and merges. Closing the tab ends that view. Reopening
-  the chat creates a fresh view at the latest message, including when Content
-  is empty.
-
-The milestone passed lint, both type checks, all 275 tests, and a fresh build.
-On macOS, the desktop check launched both shells and verified opening,
-focusing, splitting, merging, and reopening chats on a disposable copy of a
-seeded profile.
-
-Existing saved chats now use the shared composer. They can send messages,
-display live replies, stop runs, and answer agent questions above the message
-box. Switching or docking tabs preserves unsent drafts. Closing a tab ends
-its view while the run continues, and reopening the chat shows the current
-reply. The desktop check also exercises these flows with a local simulated
-provider and verifies that browsing saved chats does not prompt the model.
-
-**New chat** in Explorer opens a draft in the selected agent's General
-section. Section and project controls open drafts at their own locations.
-The first send saves the chat and its outgoing message together, before the
-provider is contacted. A connection or model failure leaves the message in
-the transcript. Closing an unsent tab leaves a draft in Explorer without
-creating a conversation.
+### Explorer
 
 Explorer can create agents from the agent picker, Shared or Closed sections
 for the selected agent, and chat-only projects within custom sections. A new
-agent opens in the Explorer tab that created it.
-
-The workspace restores region order and widths, pane splits, and open saved
-views on launch. Chat drafts save when switching or closing tabs and on
-normal quit. Reopening a chat restores its draft and text attachments.
-Deleting a chat removes its draft. A crash can lose edits since the last
-save. Markdown drafts are session-only. The desktop check covers restoration,
-draft recovery, and saving the outgoing message when the provider is unavailable.
+agent opens in the Explorer tab that created it. Markdown files open with
+preview and editing (see Local data and interface). Settings opens from the
+header as a modal.
 
 Run `node scripts/verify-saved-chats-desktop.mjs` after a build. It launches
-the default workspace with fresh and seeded disposable profiles.
-
-### Before merging to main
-
-Before merging the workspace into `main`, verify all four:
-
-1. **Fresh and existing profiles.** Verify the first agent, section, and
-   project can be created from an empty profile. Use a disposable copy of an
-   existing Granite profile to confirm its agents, sections, projects, saved
-   chats, and transcripts appear in the new shell. The desktop check uses
-   disposable fresh and seeded profiles.
-2. **Daily chat workflows.** Verify Send, streaming, and Stop. Close and
-   reopen a tab during an active run and confirm the run continues. Drag and
-   resize panes with a long transcript and an active stream.
-3. **Layout restoration.** Restart Granite and confirm region widths, splits,
-   and open views return in one app-wide layout.
-4. **Regression checks.** Run lint, both type checks, the full test suite, a
-   fresh build, and the applicable desktop checks.
+the workspace with fresh and seeded disposable profiles and a local simulated
+provider. It covers opening, focusing, splitting, merging and reopening chats,
+sending and stopping, draft and layout restoration, saving the outgoing message
+when the provider is unavailable, and that browsing saved chats does not
+prompt the model.
 
 ## Source layout
 
@@ -131,7 +104,11 @@ Before merging the workspace into `main`, verify all four:
 | `src/backend/auth/`, `connections/`, `models/` | Independent sign-in, encrypted connection/account storage and model access. |
 | `src/backend/workspace/` | Protected agent files, initialization and file viewing. |
 | `src/shared/` | Types across the desktop bridge. |
-| `src/renderer/src/app/`, `components/`, `styles/` | Composition/session state, UI components and styling. |
+| `src/renderer/src/app/` | `App.tsx` composition plus session hooks (chat drafts, workspace chats, saved-chat and layout storage). |
+| `src/renderer/src/components/` | UI by screen: `workspace/` (Explorer, content, layout, regions, panes), `settings/`, `header/`, `controls/`, `icons/`. |
+| `src/renderer/src/styles/` | Stylesheets and design tokens (`tokens.css`). |
+| `tests/` | Backend, harness, layout and renderer-logic tests, plus `tests/desktop/` for the desktop session helper. |
+| `scripts/` | Test runner, PTY preparation, desktop verification (`verify-desktop.mjs`, `verify-saved-chats-desktop.mjs`) and live/framework checks. |
 
 Keep Electron main and the worker built independently. The renderer has no Node integration, uses context isolation/sandboxing, and receives no saved model credentials. Validated HTTP/HTTPS links open in the system browser; arbitrary new windows/navigation and file/application links remain blocked.
 
@@ -240,7 +217,7 @@ Open Settings → Connections to add independent ChatGPT sign-in, a Responses AP
 
 For LM Studio on another device, use that device's reachable server address (for example `http://192.168.1.50:1234/v1`); localhost refers to Granite's machine. The network/firewall must permit access. API keys use Electron safeStorage and are not sent back to the renderer; Linux plaintext fallback is rejected. Endpoint changes with saved keys require explicit key handling. Account sign-in belongs to Granite, not Codex.
 
-There are **no whole-run time/step/tool-count caps** and no fixed terminal deadline. `src/backend/context/` owns scoped source indexing, provenance, file reconciliation, request token budgets and revision-aware cache reuse. The loop counts schemas and compacts older valid history before the configured model window fills. Full transcripts remain saved. See [the harness guide](harness.md) and [Pass 4 verification](<vault/Verification/Pass 4 Implementation & Testing.md>).
+There are **no whole-run time/step/tool-count caps** and no fixed terminal deadline. `src/backend/context/` owns scoped source indexing, provenance, file reconciliation, request token budgets and revision-aware cache reuse. The loop counts schemas and compacts older valid history before the configured model window fills. Full transcripts remain saved. See [the harness guide](harness.md) and [Pass 4 verification](<vault/archive/v0.1/Verification/Pass 4 Implementation & Testing.md>).
 
 Repository commands, interactive sessions and previews currently require macOS confinement. Ordinary sessions/cache end with the run; only a verified ready managed preview may remain afterward without occupying model/project capacity. Previews use isolated snapshots, require refresh for newer code and stop on owning Stop/deletion/app closure. Commands support safe contained relative installer links, bounded download authorization and guarded publication. Full details: [harness guide](harness.md).
 
@@ -297,6 +274,8 @@ from an old runner as proof of compiled-artifact provenance.
 
 ### Backend cleanup verification — cleanup Pass 3
 
+> Historical results. The suite now has 268 tests, and the legacy desktop runners named here were removed on November 17.
+
 The repository runner passed the live-PTY prompt assertion, along with publication, question, preview,
 project-queue and worker-crash recovery scenarios. The offline agent runner also
 checks restart restoration, committed deletion cleanup, preserved recovery
@@ -323,7 +302,7 @@ Earlier baseline/live-agent results are retained in `docs/archive/`. They predat
 
 ### Renderer cleanup verification — cleanup Pass 4
 
-Pass 4 addressed UI state safety, message acceptance, streaming reconciliation, and provider configuration:
+Pass 4 addressed UI state safety, message acceptance, streaming reconciliation, and provider configuration. Its file paths predate the November 18 reorganization above:
 - **Message acceptance and draft preservation:** Submissions in `useAgentSession.ts` keep drafts and attached files intact and lock the composer until the backend confirms acceptance into SQLite via `delta.messages`. Failed submissions or network drops preserve the draft in place rather than clobbering newer user input.
 - **Provider presets:** Replaced the bifurcated connection forms with a unified preset configuration (`presets.ts`). Dedicated presets for ChatGPT OAuth, OpenAI, Claude/Anthropic, Gemini, DeepSeek, Kimi/Moonshot, and generic OpenAI-compatible/local servers share one editor, automatically hiding Base URL and protocol controls for standard endpoints while keeping them editable for custom/local servers.
 - **Settled stream buffer reconciliation:** `loadConversation` and `finishConversation` cleanly evict settled stream buffers, ensuring fresh database messages are authoritative and cannot be overwritten by stale in-flight deltas.
@@ -334,7 +313,7 @@ Lint (`npm run lint`), TypeScript checks (`npm run typecheck`, `npm run typechec
 
 ### Final cleanup consolidation — cleanup Pass 5
 
-Pass 5 concludes the 5-pass codebase cleanup, consolidating changes, eliminating obsolete styles, and verifying the whole system before starting v1 feature milestones:
+Pass 5 concludes the 5-pass codebase cleanup, consolidating changes, eliminating obsolete styles, and verifying the whole system before starting v1 feature milestones. Its file paths predate the November 18 reorganization above:
 - **Stylesheet and asset pruning:** Removed dead legacy selectors across `settings.css` (`.connection-card`, `.empty-connections`, `.auth-choice-*`), `responsive.css`, and `layout.css` (`.organization-content`, `.organization-create`, etc.). Upgraded the placeholder icon in `ConnectionList.tsx` to the DeepSeek whale SVG icon.
 - **Simplicity and dead code audit:** Audited changes across Passes 1–4, ensuring zero unused imports, zero console debug logs, no dangling types, and clean single-responsibility boundaries.
 - **Verified baseline:** Complete test suite, strict linter (`npm run lint`), source and test type checks (`npm run typecheck`, `npm run typecheck:tests`), and production build (`npm run build`) pass cleanly with 0 errors and 0 warnings.

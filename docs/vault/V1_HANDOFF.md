@@ -2,7 +2,7 @@
 
 ## 1. Project Status
 - **Current Milestone:** Granite v1 (v0.1 baseline) is **Complete & Verified** (Commit `d72f3b3`).
-- **Test Baseline:** 241/241 automated tests passing (`npm test`), 0 lint warnings (`oxlint`), clean build (`npm run build`), local package verified (`release/mac-arm64/Granite.app`).
+- **Test Baseline:** 241/241 automated tests passing at handoff (268 passing as of November 18, 2026) (`npm test`), 0 lint warnings (`oxlint`), clean build (`npm run build`), local package verified (`release/mac-arm64/Granite.app`).
 
 ## 2. Vault Diagram Remake & Docs Archive — COMPLETE
 - **Target File Created:** `docs/vault/Granite Architecture.canvas`.

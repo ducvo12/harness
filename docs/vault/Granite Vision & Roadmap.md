@@ -27,7 +27,7 @@ This goal still needs design for worker model/connection selection, task/context
 
 ## v0.1 — Complete the basic harness (COMPLETE)
 
-The foundational six passes plus Pass 3A are complete and verified (241/241 automated tests passing, clean build, local package verified). Context/memory, lifecycle, scope, tool and recovery requirements and release verification are delivered.
+The foundational six passes plus Pass 3A are complete and verified (241/241 automated tests at v0.1 acceptance; 268 passing as of November 18, 2026). Context/memory, lifecycle, scope, tool and recovery requirements and release verification are delivered.
 
 Detailed delivery records and acceptance criteria live in [[archive/v0.1/Harness Implementation Plan.md|Harness Implementation Plan]].
 

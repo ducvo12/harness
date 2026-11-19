@@ -1,6 +1,6 @@
 # Pass 3 Implementation & Testing
 
-> Dated verification record. Counts, environments and limitations below describe their recorded checkpoints. For current behavior use [the harness guide](../../harness.md); for delivery status use [[Start Here]]. Temporary evidence paths may no longer exist.
+> Dated verification record. Counts, environments and limitations below describe their recorded checkpoints. For current behavior use [the harness guide](../../../../harness.md); for delivery status use [[Start Here]]. Temporary evidence paths may no longer exist.
 
 > Implemented October 25, 2026. Repository tools, access enforcement, project scheduling, visible changes and repository-aware recovery are available. The build/type check and 86 automated checks pass; a disposable desktop walkthrough also passed. This is implementation and basic verification, not exhaustive manual acceptance of every edge case.
 

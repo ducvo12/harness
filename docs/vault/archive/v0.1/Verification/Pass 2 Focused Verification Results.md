@@ -1,6 +1,6 @@
 # Pass 2 Focused Verification Results
 
-> Dated verification record. Counts, environments and limitations below describe their recorded checkpoints. For current behavior use [the harness guide](../../harness.md); for delivery status use [[Start Here]]. Temporary evidence paths may no longer exist.
+> Dated verification record. Counts, environments and limitations below describe their recorded checkpoints. For current behavior use [the harness guide](../../../../harness.md); for delivery status use [[Start Here]]. Temporary evidence paths may no longer exist.
 
 > October 25, 2026 — **selected checks passed**. Scope: basic replies, steering, queues, and Stop/Continue. This is not full Pass 2 acceptance.
 

@@ -14,7 +14,7 @@
 | **v0.1 Pass 5** — Lifecycle and extensions | Implemented & verified | Temporary expiry/Keep, container cascades, missing-folder recovery, skill imports, scoped MCP |
 | **v0.1 Pass 6** — Integration and release verification | Implemented & verified | Whole-app integration, multi-chat concurrency, status consistency, provider resilience, packaging & migration |
 
-Implementation and integrated acceptance for the v0.1 baseline are complete across all six passes plus 3A. 241/241 automated tests pass. Packaging and migration verified.
+Implementation and integrated acceptance for the v0.1 baseline are complete across all six passes plus 3A. 241/241 automated tests passed at acceptance; the suite now has 268 passing (November 18, 2026). Packaging and migration verified.
 
 ## Current specifications
 
