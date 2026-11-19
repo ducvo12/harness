@@ -5,7 +5,6 @@ import { createPane, findPane, moveTab, dockPane, dockTab, layoutFits, paneRects
 
 import { initialLayout } from './fixtures/panes.ts'
 
-
 test('panes start with one selected tab, and adding selects a uniquely numbered tab', () => {
   const initial = createPane('test', 'Test')
   assert.equal(initial.tabs.length, 1)
