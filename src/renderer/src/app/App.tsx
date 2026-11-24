@@ -3,7 +3,7 @@ import "../styles/panes.css";
 import "../styles/saved-chats.css";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Agent, Conversation } from "../../../shared/agent";
-import type { Result, SavedConnection } from "../../../shared/chat";
+import type { Result } from "../../../shared/chat";
 import type { Section, SectionMode } from "../../../shared/organization";
 import Header from "../components/header/Header";
 import Workspace, {
@@ -38,12 +38,17 @@ import Settings from "../components/settings/Settings";
 import type { FileDraft } from "../components/workspace/content/markdown/MarkdownView";
 import { TabBodyContext } from "../components/workspace/region/pane/TabBody";
 import {
+  ChatContext,
+  ConnectionsContext,
+} from "../components/workspace/content/chat/ChatContext";
+import {
   openDraftChat,
   openSavedChat,
   openWorkspaceFile,
   updateChatTab,
 } from "./saved-chat-layout";
 import { useChatDrafts } from "./useChatDrafts";
+import { useConnections } from "./useConnections";
 import { useSavedResource } from "./useSavedResource";
 import { chatKey, useWorkspaceChats } from "./useWorkspaceChats";
 import {
@@ -81,10 +86,6 @@ function loadAgents() {
   return window.granite.agents.list();
 }
 
-function loadConnections() {
-  return window.granite.connections.list();
-}
-
 export default function WorkspaceApp() {
   const chatDrafts = useChatDrafts();
   const [restored] = useState(() => {
@@ -117,11 +118,6 @@ export default function WorkspaceApp() {
     new Map<string, number>(),
   );
   const [creation, setCreation] = useState<Creation>();
-  const [selectedConnection, setSelectedConnection] = useState(
-    () => localStorage.getItem("granite.connection") ?? "",
-  );
-  const [editedConnections, setEditedConnections] =
-    useState<SavedConnection[]>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settings = useRef<HTMLDialogElement>(null);
   const chatSession = useWorkspaceChats();
@@ -130,17 +126,8 @@ export default function WorkspaceApp() {
     retry: retryAgents,
     update: updateAgents,
   } = useSavedResource(loadAgents, "Could not load your agents.");
-  const { result: savedConnections, retry: retryConnections } =
-    useSavedResource(loadConnections, "Could not load your connections.");
-  const connections = editedConnections
-    ? { ok: true as const, value: editedConnections }
-    : savedConnections;
-  const defaultConnection = connections?.ok
-    ? ((
-        connections.value.find((item) => item.id === selectedConnection) ??
-        connections.value[0]
-      )?.id ?? "")
-    : "";
+  const connectionState = useConnections();
+  const { connections } = connectionState;
   const { layout, nextPane, focus } = state;
   const panes = workspacePanes(layout);
   const tabSelection = JSON.stringify(
@@ -298,11 +285,6 @@ export default function WorkspaceApp() {
       ),
     );
   }, [layout, chatSession.chats]);
-
-  function selectConnection(id: string) {
-    setSelectedConnection(id);
-    localStorage.setItem("granite.connection", id);
-  }
 
   function refreshExplorer(agentId: string) {
     setExplorerRevisions((current) =>
@@ -478,19 +460,17 @@ export default function WorkspaceApp() {
     onNewProject: (section) => setCreation({ kind: "project", section }),
   };
 
-  const tabBodyState = {
-    explorerProps,
-    fileDrafts,
-    updateFileDraft,
+  const tabBodyState = { explorerProps, fileDrafts, updateFileDraft };
+  const chatState = {
+    agents,
     chatDrafts,
     chatSession,
-    connections,
-    selectedConnection: defaultConnection,
-    selectConnection,
-    openSettings: () => setSettingsOpen(true),
-    retryConnections,
     showSavedChat,
     positions,
+  };
+  const connectionsState = {
+    ...connectionState,
+    openSettings: () => setSettingsOpen(true),
   };
 
   return (
@@ -516,22 +496,26 @@ export default function WorkspaceApp() {
       {chatDrafts.error && <p role="alert">{chatDrafts.error}</p>}
 
       {/* Workspace */}
-      <TabBodyContext value={tabBodyState}>
-        <Workspace
-          layout={layout}
-          renderEmptyRegion={(type) =>
-            type === "explorer" ? (
-              <ExplorerTab {...explorerProps} />
-            ) : (
-              <p>Open a file or chat from Explorer.</p>
-            )
-          }
-          tabCloseReason={fileCloseReason}
-          onLayoutChange={changeLayout}
-          onBoundsChange={setBounds}
-          newPane={nextGroup(state)}
-        />
-      </TabBodyContext>
+      <ConnectionsContext value={connectionsState}>
+        <ChatContext value={chatState}>
+          <TabBodyContext value={tabBodyState}>
+            <Workspace
+              layout={layout}
+              renderEmptyRegion={(type) =>
+                type === "explorer" ? (
+                  <ExplorerTab {...explorerProps} />
+                ) : (
+                  <p>Open a file or chat from Explorer.</p>
+                )
+              }
+              tabCloseReason={fileCloseReason}
+              onLayoutChange={changeLayout}
+              onBoundsChange={setBounds}
+              newPane={nextGroup(state)}
+            />
+          </TabBodyContext>
+        </ChatContext>
+      </ConnectionsContext>
 
       {/* Creation menu */}
       {creation && (
@@ -564,13 +548,13 @@ export default function WorkspaceApp() {
           {connections?.ok ? (
             <Settings
               connections={connections.value}
-              onChange={setEditedConnections}
+              onChange={connectionState.setEdited}
             />
           ) : connections ? (
             <div>
               <p role="alert">{connections.error}</p>
 
-              <button type="button" onClick={() => retryConnections()}>
+              <button type="button" onClick={() => connectionState.retry()}>
                 Retry
               </button>
             </div>

@@ -1,14 +1,16 @@
-import type { MessageImage } from "../../../../../../shared/message-images";
-import type { Agent, AgentMessage } from "../../../../../../shared/agent";
+import type { AgentMessage } from "../../../../../../shared/agent";
 import { bridgeError, type Result, type SavedConnection } from "../../../../../../shared/chat";
 import { isLiveRun, type RunIntent } from "../../../../../../shared/run";
-import type { RunRequest, WorkspaceChatState } from "../../../../app/useWorkspaceChats";
+import { emptyChatDraft } from "../../../../app/useChatDrafts";
+import { chatKey } from "../../../../app/useWorkspaceChats";
+import { chatId, type ChatDestination } from "../../layout/tabs";
+import { useChatContext, useConnectionsContext } from "./ChatContext";
 import ActivityPanel from "./activity/ActivityPanel";
 import ApprovalPrompt from "./run/ApprovalPrompt";
 import Composer from "./composer/Composer";
 import QuestionPrompt from "./run/QuestionPrompt";
 import RunControls from "./run/RunControls";
-import Transcript, { type ReadingPosition } from "./transcript/Transcript";
+import Transcript from "./transcript/Transcript";
 import {
   imagesFromAttachments,
   messageWithAttachments,
@@ -26,47 +28,38 @@ export interface ComposerDraft {
 }
 
 interface ChatViewProps {
-  chat?: WorkspaceChatState;
-  agent?: Agent;
-  conversationId?: string;
-  path: string[];
-  connections?: Result<SavedConnection[]>;
-  selectedConnection: string;
-  draft: ComposerDraft;
-  onDraftChange: (draft: Partial<ComposerDraft>) => void;
-  draftId: string;
-  onSelectConnection: (id: string) => void;
-  onOpenSettings: () => void;
-  onRetryConnections: () => void;
-  onSubmit: (request: RunRequest, images?: MessageImage[]) => Promise<void>;
-  onError: (error: string) => void;
-  onReload: () => void;
-  readPosition: () => ReadingPosition | undefined;
-  savePosition: (position: ReadingPosition) => void;
+  conversation: ChatDestination;
+  tabId: string;
 }
 
 const noMessages: AgentMessage[] = [];
 const noConnections: SavedConnection[] = [];
 
-export default function ChatView({
-  chat,
-  agent,
-  conversationId,
-  path,
-  connections,
-  selectedConnection,
-  draft,
-  onDraftChange,
-  draftId,
-  onSelectConnection,
-  onOpenSettings,
-  onRetryConnections,
-  onSubmit,
-  onError,
-  onReload,
-  readPosition,
-  savePosition,
-}: ChatViewProps) {
+export default function ChatView({ conversation, tabId }: ChatViewProps) {
+  const { agents, chatDrafts, chatSession, showSavedChat, positions } =
+    useChatContext();
+  const {
+    connections,
+    selectedConnection,
+    selectConnection,
+    retry: retryConnections,
+    openSettings,
+  } = useConnectionsContext();
+  const conversationId = conversation.id;
+  const draftId = chatId(conversation);
+  const identity = { agentId: conversation.agentId, id: draftId };
+  const key = chatKey(identity);
+  const draft = chatDrafts.drafts.get(draftId) ?? emptyChatDraft;
+  const chat = chatSession.chats.get(key);
+  const agent = agents?.ok
+    ? agents.value.find((item) => item.id === conversation.agentId)
+    : undefined;
+  const onDraftChange = (change: Partial<ComposerDraft>) =>
+    chatDrafts.patch(conversation, change);
+  const onError = (error: string) => chatSession.setError(key, error);
+  const onReload = () => {
+    if (conversation.id !== undefined) chatSession.load(conversation, true);
+  };
   const result = chat?.result;
   const messages =
     chat?.messages ?? (result?.ok ? result.value.messages : noMessages);
@@ -119,18 +112,14 @@ export default function ChatView({
       );
       return;
     }
-    await onSubmit(
-      {
-        connection: available,
-        model: modelSelection.model,
-        effort: modelSelection.effort,
-        text,
-        intent,
-      },
-      intent === "message"
-        ? imagesFromAttachments(draft.attachments)
-        : undefined,
-    );
+    const request = {
+      connection: available,
+      model: modelSelection.model,
+      effort: modelSelection.effort,
+      text,
+      intent,
+    };
+    // TODO(human): submit the run with chatSession.submit(identity, request, message).
   }
 
   async function request(
@@ -163,10 +152,10 @@ export default function ChatView({
         <Transcript
           draft={!conversationId}
           result={transcript}
-          path={path}
+          path={conversation.path}
           retry={onReload}
-          readPosition={readPosition}
-          savePosition={savePosition}
+          readPosition={() => positions.current.get(tabId)}
+          savePosition={(position) => positions.current.set(tabId, position)}
         />
 
         <ActivityPanel
@@ -239,7 +228,7 @@ export default function ChatView({
             <div className="error" role="alert">
               {connections.error}
 
-              <button type="button" onClick={onRetryConnections}>
+              <button type="button" onClick={retryConnections}>
                 Retry
               </button>
             </div>
@@ -249,7 +238,7 @@ export default function ChatView({
             <div className="error" role="alert">
               Restore this chat’s saved connection to get a reply.
               {savedConnections.length > 0 && (
-                <button type="button" onClick={onOpenSettings}>
+                <button type="button" onClick={openSettings}>
                   Manage connections
                 </button>
               )}
@@ -290,8 +279,8 @@ export default function ChatView({
             loaded={loaded}
             submitting={submitting}
             run={run}
-            onSelectConnection={onSelectConnection}
-            onOpenSettings={onOpenSettings}
+            onSelectConnection={selectConnection}
+            onOpenSettings={openSettings}
             onDraftChange={(text) => onDraftChange({ text })}
             onSend={() => send("message")}
             onStop={stop}
