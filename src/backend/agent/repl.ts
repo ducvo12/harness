@@ -65,8 +65,11 @@ async function main() {
   // messages
   const messages = [];
 
+  // turns
+  const turns = 0;
+
   // loop
-  for (;;) {
+  while (turns < 10) {
     const prompt = await rl.question("> ");
     if (!prompt.trim()) continue; // handle empty input
     messages.push({ role: "user", content: prompt });
