@@ -12,6 +12,7 @@ export async function callModel(
   token: string,
   model: string,
   instructions: string,
+  tools: unknown[],
   input: unknown[],
 ): Promise<ModelEvent[]> {
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -23,6 +24,7 @@ export async function callModel(
     body: JSON.stringify({
       model,
       instructions,
+      tools,
       input,
       store: false,
       stream: true,

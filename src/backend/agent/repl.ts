@@ -9,11 +9,32 @@ import { createInterface } from "node:readline/promises";
 import { ChatGPTAccounts } from "../auth/chatgpt.ts";
 import { callModel } from "./model.ts";
 
-// Must be a model your ChatGPT plan allows; Granite's model picker lists them.
-const MODEL = "gpt-5.6-luna";
-
 // params
+const MODEL = "gpt-5.6-luna";
 const INSTRUCTIONS = "only speak in olden english";
+const TOOLS = [
+  {
+    type: "function",
+    name: "get_miligrams",
+    strict: true,
+    description: "Get the amount of miligrams of liquid in a beaker.",
+    parameters: {
+      type: "object",
+      properties: {
+        section: {
+          type: "integer",
+          description: "The section number to get the beaker from.",
+        },
+        beaker: {
+          type: "integer",
+          description: "The beaker number to get the miligrams from.",
+        },
+      },
+      required: ["section", "beaker"],
+      additionalProperties: false,
+    },
+  },
+];
 
 // Same app name and data folder as `npm run dev`, so we find the same keychain key and accounts.
 app.setName("granite");
@@ -36,26 +57,48 @@ async function main() {
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   rl.on("close", () => app.exit(0)); // Ctrl-D ends the session
+
+  // loop
   for (;;) {
     const prompt = await rl.question("> ");
     if (!prompt.trim()) continue;
     // resolve() refreshes the token when it is about to expire.
     const input = [{ role: "user", content: prompt }];
+
     const events = await callModel(
       await accounts.resolve(account.id),
       MODEL,
       INSTRUCTIONS,
+      TOOLS,
       input,
     );
 
     // print
+    if (true) {
+      // easy for me to toggle between printing and not printing
+      console.dir(
+        events.filter((e) => e.event !== "response.metadata"),
+        { depth: null },
+      );
+    }
+
     for (const event of events) {
+      /*
       if (event.event === "response.output_text.delta") {
         process.stdout.write(event.data.delta);
+      } else if (event.event === "response.function_call_arguments.delta") {
+        process.stdout.write(event.data.delta);
+      }
+      */
+
+      if (event.event === "response.output_item.done") {
+        console.log(event.data.item);
       }
     }
 
     console.log("");
+
+    // how many miligrams are in beaker 4 of section 2
   }
 }
 
