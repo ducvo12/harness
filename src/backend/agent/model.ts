@@ -11,6 +11,7 @@ type ModelEvent = {
 export async function callModel(
   token: string,
   model: string,
+  instructions: string,
   input: unknown[],
 ): Promise<ModelEvent[]> {
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -19,7 +20,13 @@ export async function callModel(
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ model, input, store: false, stream: true }),
+    body: JSON.stringify({
+      model,
+      instructions,
+      input,
+      store: false,
+      stream: true,
+    }),
   });
 
   // pure text output from the api

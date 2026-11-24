@@ -12,6 +12,9 @@ import { callModel } from "./model.ts";
 // Must be a model your ChatGPT plan allows; Granite's model picker lists them.
 const MODEL = "gpt-5.6-luna";
 
+// params
+const INSTRUCTIONS = "only speak in olden english";
+
 // Same app name and data folder as `npm run dev`, so we find the same keychain key and accounts.
 app.setName("granite");
 
@@ -41,6 +44,7 @@ async function main() {
     const events = await callModel(
       await accounts.resolve(account.id),
       MODEL,
+      INSTRUCTIONS,
       input,
     );
 
