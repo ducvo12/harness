@@ -2,6 +2,7 @@
 
 // Runs inside Electron (not plain Node) because Granite's ChatGPT tokens are
 // encrypted with Electron's safeStorage, which only Electron can unlock.
+
 import { app, safeStorage } from "electron";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -9,35 +10,9 @@ import { ChatGPTAccounts } from "../auth/chatgpt.ts";
 import { callModel } from "./model.ts";
 
 // params
-const MODEL = "gpt-5.6-luna";
-const INSTRUCTIONS = "only speak in olden english";
-const TOOLS = [
-  {
-    type: "function",
-    name: "get_miligrams",
-    strict: true,
-    description: "Get the amount of miligrams of liquid in a beaker.",
-    parameters: {
-      type: "object",
-      properties: {
-        section: {
-          type: "integer",
-          description: "The section number to get the beaker from.",
-        },
-        beaker: {
-          type: "integer",
-          description: "The beaker number to get the miligrams from.",
-        },
-      },
-      required: ["section", "beaker"],
-      additionalProperties: false,
-    },
-  },
-];
-
-const get_miligrams = (section: number, beaker: number) => {
-  return "32 mg";
-};
+import { MODEL, INSTRUCTIONS, TOOLS } from "./params.ts";
+// tools
+import { handlers } from "./tools.ts";
 
 // Same app name and data folder as `npm run dev`, so we find the same keychain key and accounts.
 app.setName("granite");
@@ -113,17 +88,23 @@ async function main() {
         break;
       } else {
         for (const call of function_calls) {
-          if (call.name === "get_miligrams") {
-            const args = JSON.parse(call.arguments);
+          const handler = Object.hasOwn(handlers, call.name)
+            ? handlers[call.name as keyof typeof handlers]
+            : undefined;
 
-            const section = args.section;
-            const beaker = args.beaker;
+          if (handler) {
+            const output = handler(JSON.parse(call.arguments));
 
-            const result = get_miligrams(section, beaker);
             messages.push({
               type: "function_call_output",
               call_id: call.call_id,
-              output: result,
+              output: output,
+            });
+          } else {
+            messages.push({
+              type: "function_call_output",
+              call_id: call.call_id,
+              output: `Unknown function: ${call.name}. Available functions: ${TOOLS.map((t) => t.name).join(", ")}`,
             });
           }
         }
