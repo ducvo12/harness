@@ -45,6 +45,40 @@ export async function callModel(
     const event = spl[0].slice("event: ".length); // slices first 7 characters (which is "event: ") to get the event name
     const data = JSON.parse(spl[1].slice("data: ".length));
 
+    if (event === "error") {
+      throw new Error(
+        `Model stream failed. Error: ${JSON.stringify(
+          {
+            code: data.code,
+            message: data.message,
+          },
+          null,
+          2,
+        )}`,
+      );
+    } else if (event === "response.failed") {
+      throw new Error(
+        `Model response failed. Error: ${JSON.stringify(
+          {
+            code: data.response.error.code,
+            message: data.response.error.message,
+          },
+          null,
+          2,
+        )}`,
+      );
+    } else if (event === "response.incomplete") {
+      throw new Error(
+        `Model stream stopped early. Error: ${JSON.stringify(
+          {
+            message: data.response.incomplete_details.reason,
+          },
+          null,
+          2,
+        )}`,
+      );
+    }
+
     return {
       event: event,
       data: data,

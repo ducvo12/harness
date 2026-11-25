@@ -53,83 +53,88 @@ async function main() {
     // resolve-request loop
     while (turns < MAX_TURNS) {
       // call model
-      const events = await callModel(
-        await accounts.resolve(account.id),
-        MODEL,
-        INSTRUCTIONS,
-        TOOLS,
-        messages,
-      );
+      try {
+        const events = await callModel(
+          await accounts.resolve(account.id),
+          MODEL,
+          INSTRUCTIONS,
+          TOOLS,
+          messages,
+        );
 
-      // log messages
-      const function_calls = [];
-      for (const event of events) {
-        if (event.event === "response.output_item.done") {
-          const item = event.data.item;
+        // log messages
+        const function_calls = [];
+        for (const event of events) {
+          if (event.event === "response.output_item.done") {
+            const item = event.data.item;
 
-          messages.push(item);
-          console.log(item);
+            messages.push(item);
+            console.log(item);
 
-          if (item.type === "message") {
-            if (item.phase === "final_answer") {
-              // break
-              // ^ commented because that end condition might be fragile
-              // real end condition is below
-            }
-          }
-          if (item.type === "function_call") {
-            function_calls.push(item);
-          }
-        }
-      }
-
-      // resolve function calls if needed
-      if (function_calls.length === 0) {
-        break;
-      } else {
-        for (const call of function_calls) {
-          const handler = Object.hasOwn(handlers, call.name)
-            ? handlers[call.name as keyof typeof handlers]
-            : undefined;
-
-          if (handler) {
-            const args = JSON.parse(call.arguments);
-
-            if (call.name === "bash") {
-              // checks for bash (needs approval)
-              const approval = await rl.question(
-                `Execute bash command? ${args.command} (y/n) `,
-              );
-              if (approval.toLowerCase() !== "y") {
-                messages.push({
-                  type: "function_call_output",
-                  call_id: call.call_id,
-                  output: "Command execution cancelled.",
-                });
-                continue; // skip to next function call if not approved
+            if (item.type === "message") {
+              if (item.phase === "final_answer") {
+                // break
+                // ^ commented because that end condition might be fragile
+                // real end condition is below
               }
             }
-
-            const output = await handler(args);
-            messages.push({
-              type: "function_call_output",
-              call_id: call.call_id,
-              output: output,
-            });
-          } else {
-            // if function name not recognized
-            messages.push({
-              type: "function_call_output",
-              call_id: call.call_id,
-              output: `Unknown function: ${call.name}. Available functions: ${TOOLS.map((t) => t.name).join(", ")}`,
-            });
+            if (item.type === "function_call") {
+              function_calls.push(item);
+            }
           }
         }
-      }
 
-      turns++;
-      if (turns === MAX_TURNS) {
-        console.log("hit turn limit");
+        // resolve function calls if needed
+        if (function_calls.length === 0) {
+          break;
+        } else {
+          for (const call of function_calls) {
+            const handler = Object.hasOwn(handlers, call.name)
+              ? handlers[call.name as keyof typeof handlers]
+              : undefined;
+
+            if (handler) {
+              const args = JSON.parse(call.arguments);
+
+              if (call.name === "bash") {
+                // checks for bash (needs approval)
+                const approval = await rl.question(
+                  `Execute bash command? ${args.command} (y/n) `,
+                );
+                if (approval.toLowerCase() !== "y") {
+                  messages.push({
+                    type: "function_call_output",
+                    call_id: call.call_id,
+                    output: "Command execution cancelled.",
+                  });
+                  continue; // skip to next function call if not approved
+                }
+              }
+
+              const output = await handler(args);
+              messages.push({
+                type: "function_call_output",
+                call_id: call.call_id,
+                output: output,
+              });
+            } else {
+              // if function name not recognized
+              messages.push({
+                type: "function_call_output",
+                call_id: call.call_id,
+                output: `Unknown function: ${call.name}. Available functions: ${TOOLS.map((t) => t.name).join(", ")}`,
+              });
+            }
+          }
+        }
+
+        turns++;
+        if (turns === MAX_TURNS) {
+          console.log("hit turn limit");
+        }
+      } catch (error: any) {
+        console.log("Error: " + error.message);
+        break;
       }
     }
 
