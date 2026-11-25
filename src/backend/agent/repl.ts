@@ -1,8 +1,7 @@
-// !!! to run: granite % npx electron src/backend/agent/repl.ts
+// !!! to run: npx electron src/backend/agent/repl.ts
 
 // Runs inside Electron (not plain Node) because Granite's ChatGPT tokens are
 // encrypted with Electron's safeStorage, which only Electron can unlock.
-// Run: npx electron src/backend/agent/repl.ts
 import { app, safeStorage } from "electron";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -65,20 +64,19 @@ async function main() {
   // messages
   const messages = [];
 
-  // turns
-  const turns = 0;
-
   // loop
-  while (turns < 10) {
+  const MAX_TURNS = 10;
+  while (true) {
     const prompt = await rl.question("> ");
     if (!prompt.trim()) continue; // handle empty input
     messages.push({ role: "user", content: prompt });
 
     // resolve() refreshes the token when it is about to expire.
 
+    // turns
+    let turns = 0;
     // resolve-request loop
-    let loop_finish = false;
-    while (!loop_finish) {
+    while (turns < MAX_TURNS) {
       // call model
       const events = await callModel(
         await accounts.resolve(account.id),
@@ -99,7 +97,7 @@ async function main() {
 
           if (item.type === "message") {
             if (item.phase === "final_answer") {
-              // loop_finish = true;
+              // break
               // ^ commented because that end condition might be fragile
               // real end condition is below
             }
@@ -112,7 +110,7 @@ async function main() {
 
       // resolve function calls if needed
       if (function_calls.length === 0) {
-        loop_finish = true;
+        break;
       } else {
         for (const call of function_calls) {
           if (call.name === "get_miligrams") {
@@ -129,6 +127,11 @@ async function main() {
             });
           }
         }
+      }
+
+      turns++;
+      if (turns === MAX_TURNS) {
+        console.log("hit turn limit");
       }
     }
 
