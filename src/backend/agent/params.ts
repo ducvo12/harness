@@ -1,5 +1,5 @@
 export const MODEL = "gpt-5.6-luna";
-export const INSTRUCTIONS = "only speak in olden english";
+export const INSTRUCTIONS = "The user is on MacOS. Only speak in olden english";
 export const TOOLS = [
   {
     type: "function",
@@ -19,6 +19,30 @@ export const TOOLS = [
         },
       },
       required: ["section", "beaker"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "bash",
+    strict: true,
+    description:
+      "Run a shell command with /bin/bash and return its stdout. " +
+      "Each call runs in a fresh shell starting at the repository root: `cd`, variables and " +
+      "other state do NOT carry over between calls, so chain steps with && " +
+      "(e.g. `cd src && ls`). Commands are killed after 30 seconds, so do not start servers, " +
+      "watchers or anything that waits for input; use non-interactive flags (e.g. `git --no-pager`). " +
+      "Long output is truncated, so prefer targeted commands (grep, head, sed -n) over printing " +
+      "whole large files. The user may deny a command; if so, try a different approach.",
+    parameters: {
+      type: "object",
+      properties: {
+        command: {
+          type: "string",
+          description: "The bash command to run, e.g. `ls -la` or `npm test`.",
+        },
+      },
+      required: ["command"],
       additionalProperties: false,
     },
   },

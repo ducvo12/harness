@@ -93,14 +93,31 @@ async function main() {
             : undefined;
 
           if (handler) {
-            const output = handler(JSON.parse(call.arguments));
+            const args = JSON.parse(call.arguments);
 
+            if (call.name === "bash") {
+              // checks for bash (needs approval)
+              const approval = await rl.question(
+                `Execute bash command? ${args.command} (y/n) `,
+              );
+              if (approval.toLowerCase() !== "y") {
+                messages.push({
+                  type: "function_call_output",
+                  call_id: call.call_id,
+                  output: "Command execution cancelled.",
+                });
+                continue; // skip to next function call if not approved
+              }
+            }
+
+            const output = await handler(args);
             messages.push({
               type: "function_call_output",
               call_id: call.call_id,
               output: output,
             });
           } else {
+            // if function name not recognized
             messages.push({
               type: "function_call_output",
               call_id: call.call_id,
