@@ -1,3 +1,5 @@
+# Paused, check agent branch
+
 # Granite desktop development
 
 > Current development guide, reviewed November 18, 2026. [Harness behavior](harness.md) describes delivered features; [the planning vault](<vault/Start Here.md>) separates remaining work and verification.
