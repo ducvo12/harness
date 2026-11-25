@@ -27,7 +27,7 @@ export const TOOLS = [
     name: "bash",
     strict: true,
     description:
-      "Run a shell command with /bin/bash and return its stdout. " +
+      "Run a shell command with /bin/bash and return its exitCode (number, null if killed), stdout (string), stderr (string), and a note (string). " +
       "Each call runs in a fresh shell starting at the repository root: `cd`, variables and " +
       "other state do NOT carry over between calls, so chain steps with && " +
       "(e.g. `cd src && ls`). Commands are killed after 30 seconds, so do not start servers, " +

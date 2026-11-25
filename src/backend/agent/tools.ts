@@ -27,32 +27,52 @@ type bash_args = {
 const bash = async (args: bash_args) => {
   const { command } = args;
 
+  type ExecResult = {
+    exitCode: number | null;
+    stdout: string | null;
+    stderr: string | null;
+    note: string | null;
+  };
+  const OUTPUT_CHAR_LIMIT = 10_000;
+  let resString: string;
+
+  // try catch to run command
   try {
-    const { stdout, stderr } = await run(command, {
+    const { stdout, stderr } = await run("set -o pipefail; " + command, {
       cwd: cwd + "/toy", // directory the command runs in
-      timeout: 30_000, // ms; kills the command after this
-      maxBuffer: 1024 * 1024, // max bytes of stdout/stderr (default 1 MB)
-      shell: "/bin/bash", // default is /bin/sh; bash matches the tool's name
+      timeout: 30_000, // 30s; kill command if it takes longer than this
+      maxBuffer: 1024 * 1024, // 1 mb; max stdout/stderr buffer size
+      shell: "/bin/bash",
     });
 
-    const LIMIT = 10_000;
-    return `
-    Executed command: ${command}.
-    Results: ${
-      stdout.length > LIMIT
-        ? stdout.slice(0, LIMIT / 2) +
-          "\n[... truncated ...]\n" +
-          stdout.slice(-LIMIT / 2)
-        : stdout
-    }. 
-    Errors: ${
-      stderr.length > LIMIT
-        ? stderr.slice(0, LIMIT / 2) +
-          "\n[... truncated ...]\n" +
-          stderr.slice(-LIMIT / 2)
-        : stderr
-    }`;
+    // get result
+    const res: ExecResult = {
+      exitCode: 0,
+      stdout: stdout,
+      stderr: stderr,
+      note: null,
+    };
+    resString = JSON.stringify(res, null, 2);
   } catch (error: any) {
-    return `Error executing command: ${command}. Error: ${error}`;
+    // handle error
+    const res: ExecResult = {
+      exitCode: typeof error.code === "number" ? error.code : null,
+      stdout: error.stdout,
+      stderr: error.stderr,
+      note: error.killed
+        ? "killed after 30s timeout"
+        : error.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
+          ? "output exceeded 1 MB and was cut off; use a narrower command"
+          : null,
+    };
+    resString = JSON.stringify(res, null, 2);
   }
+
+  return `Executed command: ${command}. Results: ${
+    resString.length > OUTPUT_CHAR_LIMIT
+      ? resString.slice(0, OUTPUT_CHAR_LIMIT / 2) +
+        "\n[... truncated ...]\n" +
+        resString.slice(-OUTPUT_CHAR_LIMIT / 2)
+      : resString
+  }`;
 };
