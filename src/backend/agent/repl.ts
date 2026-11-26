@@ -129,29 +129,24 @@ async function main() {
 
               if (call.name === "bash") {
                 // checks for bash (needs approval)
-                const approval = await rl.question(
+                const approvalResponse = await rl.question(
                   `Execute bash command? ${args.command} (y/n) `,
                 );
 
-                if (approval.toLowerCase() === "y") {
-                  log("tool_approval", {
-                    call_id: call.call_id,
-                    name: call.name,
-                    approval: true,
-                  });
-                } else {
+                const approval = approvalResponse.toLowerCase() === "y";
+
+                log("tool_approval", {
+                  call_id: call.call_id,
+                  name: call.name,
+                  approval: approval,
+                });
+
+                if (!approval) {
                   messages.push({
                     type: "function_call_output",
                     call_id: call.call_id,
                     output: "Command execution cancelled.",
                   });
-
-                  log("tool_approval", {
-                    call_id: call.call_id,
-                    name: call.name,
-                    approval: false,
-                  });
-
                   continue; // skip to next function call if not approved
                 }
               }
