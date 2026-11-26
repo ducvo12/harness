@@ -1,7 +1,7 @@
 // One request to the Responses API. ChatGPT plan tokens use the same official
 // endpoint as API keys, so this works for either.
 // ChatGPT plan requests reject a bare string `input` and require `stream: true`,
-// so this waits for the whole stream, then parses it into an array of events.
+// so this parses events as they arrive, prints text deltas live, and returns all events once the stream ends
 
 type ModelEvent = {
   event: string;
@@ -31,59 +31,72 @@ export async function callModel(
     }),
   });
 
-  // pure text output from the api
-  const text = await response.text();
   if (!response.ok)
-    throw new Error(`Model request failed (HTTP ${response.status}): ${text}`);
+    throw new Error(
+      `Model request failed (HTTP ${response.status}): ${await response.text()}`,
+    );
+  if (!response.body) throw new Error("Model response had no body");
 
-  // split string object into array of events
-  const blocks = text.split("\n\n").filter(Boolean);
+  // streaming
+  const decoder = new TextDecoder();
+  const events: ModelEvent[] = [];
+  let buffer = "";
+  for await (const chunk of response.body) {
+    buffer += decoder.decode(chunk, { stream: true });
 
-  const events: ModelEvent[] = blocks.map((block) => {
-    const spl = block.split("\n");
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop()!;
 
-    const event = spl[0].slice("event: ".length); // slices first 7 characters (which is "event: ") to get the event name
-    const data = JSON.parse(spl[1].slice("data: ".length));
+    for (const block of blocks) {
+      const spl = block.split("\n");
 
-    if (event === "error") {
-      throw new Error(
-        `Model stream failed. Error: ${JSON.stringify(
-          {
-            code: data.code,
-            message: data.message,
-          },
-          null,
-          2,
-        )}`,
-      );
-    } else if (event === "response.failed") {
-      throw new Error(
-        `Model response failed. Error: ${JSON.stringify(
-          {
-            code: data.response.error.code,
-            message: data.response.error.message,
-          },
-          null,
-          2,
-        )}`,
-      );
-    } else if (event === "response.incomplete") {
-      throw new Error(
-        `Model stream stopped early. Error: ${JSON.stringify(
-          {
-            message: data.response.incomplete_details.reason,
-          },
-          null,
-          2,
-        )}`,
-      );
+      const event = spl[0].slice("event: ".length); // slices first 7 characters (which is "event: ") to get the event name
+      const data = JSON.parse(spl[1].slice("data: ".length));
+
+      if (event === "error") {
+        throw new Error(
+          `Model stream failed. Error: ${JSON.stringify(
+            {
+              code: data.code,
+              message: data.message,
+            },
+            null,
+            2,
+          )}`,
+        );
+      } else if (event === "response.failed") {
+        throw new Error(
+          `Model response failed. Error: ${JSON.stringify(
+            {
+              code: data.response.error.code,
+              message: data.response.error.message,
+            },
+            null,
+            2,
+          )}`,
+        );
+      } else if (event === "response.incomplete") {
+        throw new Error(
+          `Model stream stopped early. Error: ${JSON.stringify(
+            {
+              message: data.response.incomplete_details.reason,
+            },
+            null,
+            2,
+          )}`,
+        );
+      }
+
+      if (data.type === "response.output_text.delta") {
+        process.stdout.write(data.delta);
+      }
+
+      events.push({
+        event: event,
+        data: data,
+      });
     }
-
-    return {
-      event: event,
-      data: data,
-    };
-  });
+  }
 
   return events;
 }
