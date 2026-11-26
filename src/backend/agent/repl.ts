@@ -3,10 +3,6 @@
 
 import { existsSync } from "node:fs";
 
-// run logging
-import { appendFileSync, mkdirSync } from "node:fs";
-import { randomUUID } from "node:crypto";
-
 // Runs inside Electron (not plain Node) because Granite's ChatGPT tokens are
 // encrypted with Electron's safeStorage, which only Electron can unlock.
 import { app, safeStorage } from "electron";
@@ -19,7 +15,8 @@ import { callModel } from "./model.ts";
 import { MODEL, INSTRUCTIONS, TOOLS } from "./params.ts";
 // tools
 import { handlers } from "./tools.ts";
-import { printItem, printResult } from "./print.ts";
+import { printItem, printResult } from "./_print.ts";
+import { openLog } from "./_log.ts";
 
 // Same app name and data folder as `npm run dev`, so we find the same keychain key and accounts.
 app.setName("granite");
@@ -32,13 +29,7 @@ async function main() {
   }
 
   // setting up logging
-  mkdirSync("runs", { recursive: true }); // no error if it already exists
-  const logPath = `runs/${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}.jsonl`;
-  type LogEntry = {
-    type: string;
-    time: string;
-    [key: string]: unknown;
-  };
+  const log = openLog("runs");
 
   // accounts
   const accounts = new ChatGPTAccounts(
@@ -65,27 +56,19 @@ async function main() {
   // loop
   const MAX_TURNS = 10;
 
-  const startLog: LogEntry = {
-    type: "run_start",
-    time: new Date().toISOString(),
+  log("run_start", {
     cwd: cwd,
     model: MODEL,
     instructions: INSTRUCTIONS,
     maxTurns: MAX_TURNS,
-  };
-  appendFileSync(logPath, JSON.stringify(startLog) + "\n");
+  });
 
   while (true) {
     const prompt = await rl.question("> ");
     if (!prompt.trim()) continue; // handle empty input
     messages.push({ role: "user", content: prompt });
 
-    const userPromptLog: LogEntry = {
-      type: "user",
-      time: new Date().toISOString(),
-      prompt: prompt,
-    };
-    appendFileSync(logPath, JSON.stringify(userPromptLog) + "\n");
+    log("user", { prompt: prompt });
 
     // turns
     let turns = 0;
@@ -117,36 +100,22 @@ async function main() {
                 .map((part: any) => part.text)
                 .join("");
 
-              const modelOutputLog = {
-                type: "model_output",
-                time: new Date().toISOString(),
-                model_output: text,
-              };
-              appendFileSync(logPath, JSON.stringify(modelOutputLog) + "\n");
+              log("model_output", { model_output: text });
             } else if (item.type === "function_call") {
               function_calls.push(item);
 
-              const toolCallLog = {
-                type: "tool_call",
-                time: new Date().toISOString(),
+              log("tool_call", {
                 call_id: item.call_id,
                 name: item.name,
                 args: JSON.parse(item.arguments),
-              };
-              appendFileSync(logPath, JSON.stringify(toolCallLog) + "\n");
+              });
             }
           }
         }
 
         // resolve function calls if needed
         if (function_calls.length === 0) {
-          const doneLog = {
-            type: "done",
-            time: new Date().toISOString(),
-            reason: "no_tools_calls",
-            turns: turns,
-          };
-          appendFileSync(logPath, JSON.stringify(doneLog) + "\n");
+          log("done", { reason: "no_tool_calls", turns: turns });
 
           break;
         } else {
@@ -165,17 +134,11 @@ async function main() {
                 );
 
                 if (approval.toLowerCase() === "y") {
-                  const toolApprovalLog = {
-                    type: "tool_approval",
-                    time: new Date().toISOString(),
+                  log("tool_approval", {
                     call_id: call.call_id,
                     name: call.name,
                     approval: true,
-                  };
-                  appendFileSync(
-                    logPath,
-                    JSON.stringify(toolApprovalLog) + "\n",
-                  );
+                  });
                 } else {
                   messages.push({
                     type: "function_call_output",
@@ -183,17 +146,11 @@ async function main() {
                     output: "Command execution cancelled.",
                   });
 
-                  const toolApprovalLog = {
-                    type: "tool_approval",
-                    time: new Date().toISOString(),
+                  log("tool_approval", {
                     call_id: call.call_id,
                     name: call.name,
                     approval: false,
-                  };
-                  appendFileSync(
-                    logPath,
-                    JSON.stringify(toolApprovalLog) + "\n",
-                  );
+                  });
 
                   continue; // skip to next function call if not approved
                 }
@@ -207,15 +164,12 @@ async function main() {
                 output: output,
               });
 
-              const toolOutputLog = {
-                type: "tool_output",
-                time: new Date().toISOString(),
+              log("tool_output", {
                 call_id: call.call_id,
                 name: call.name,
                 args: JSON.parse(call.arguments),
                 output: output,
-              };
-              appendFileSync(logPath, JSON.stringify(toolOutputLog) + "\n");
+              });
             } else {
               // if function name not recognized
               messages.push({
@@ -224,13 +178,10 @@ async function main() {
                 output: `Unknown tool: ${call.name}. Available tools: ${TOOLS.map((t) => t.name).join(", ")}`,
               });
 
-              const unknownToolLog = {
-                type: "unknown_tool",
-                time: new Date().toISOString(),
+              log("unknown_tool", {
                 call_id: call.call_id,
                 name: call.name,
-              };
-              appendFileSync(logPath, JSON.stringify(unknownToolLog) + "\n");
+              });
             }
           }
         }
@@ -238,27 +189,18 @@ async function main() {
         if (turns === MAX_TURNS) {
           console.log("hit turn limit");
 
-          const doneLog = {
-            type: "done",
-            time: new Date().toISOString(),
-            reason: "turn_limit",
-            turns: turns,
-          };
-          appendFileSync(logPath, JSON.stringify(doneLog) + "\n");
+          log("done", { reason: "turn_limit", turns: turns });
 
           break;
         }
       } catch (error: any) {
         console.log("Error: " + error.message);
 
-        const doneLog = {
-          type: "done",
-          time: new Date().toISOString(),
+        log("done", {
           reason: "error",
           error: error.message,
           turns: turns,
-        };
-        appendFileSync(logPath, JSON.stringify(doneLog) + "\n");
+        });
 
         break;
       }
