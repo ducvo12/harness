@@ -2,15 +2,13 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 const run = promisify(exec);
-import path from "path";
-import { fileURLToPath } from "url";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const cwd = __dirname;
 
-export const handlers: Record<string, (args: any) => Promise<string>> = {
+export const handlers: Record<
+  string,
+  (args: any, cwd: string) => Promise<string>
+> = {
   get_miligrams: (args: get_miligrams_args) => get_miligrams(args),
-  bash: (args: bash_args) => bash(args),
+  bash: (args: bash_args, cwd: string) => bash(args, cwd),
 };
 
 type get_miligrams_args = {
@@ -24,7 +22,7 @@ const get_miligrams = async (args: get_miligrams_args) => {
 type bash_args = {
   command: string;
 };
-const bash = async (args: bash_args) => {
+const bash = async (args: bash_args, cwd: string) => {
   const { command } = args;
 
   type ExecResult = {
@@ -39,7 +37,7 @@ const bash = async (args: bash_args) => {
   // try catch to run command
   try {
     const { stdout, stderr } = await run("set -o pipefail; " + command, {
-      cwd: cwd + "/toy", // directory the command runs in
+      cwd: cwd, // directory the command runs in
       timeout: 30_000, // 30s; kill command if it takes longer than this
       maxBuffer: 1024 * 1024, // 1 mb; max stdout/stderr buffer size
       shell: "/bin/bash",

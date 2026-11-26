@@ -1,0 +1,8 @@
+{
+  "name": "todo-format",
+  "type": "module",
+  "scripts": {
+    "start": "node main.js",
+    "test": "node --test"
+  }
+}

@@ -1,4 +1,7 @@
-// !!! to run: npx electron src/backend/agent/repl.ts
+// !!! to run: npx electron src/backend/agent/repl.ts "$dir"
+// or npx electron src/backend/agent/repl.ts <repo-dir> for custom repo
+
+import { existsSync } from "node:fs";
 
 // Runs inside Electron (not plain Node) because Granite's ChatGPT tokens are
 // encrypted with Electron's safeStorage, which only Electron can unlock.
@@ -13,11 +16,17 @@ import { callModel } from "./model.ts";
 import { MODEL, INSTRUCTIONS, TOOLS } from "./params.ts";
 // tools
 import { handlers } from "./tools.ts";
+import { printItem, printResult } from "./print.ts";
 
 // Same app name and data folder as `npm run dev`, so we find the same keychain key and accounts.
 app.setName("granite");
 
 async function main() {
+  const cwd = process.argv[2];
+  if (!cwd || !existsSync(cwd)) {
+    throw new Error("Usage: npx electron src/backend/agent/repl.ts <repo-dir>");
+  }
+
   const accounts = new ChatGPTAccounts(
     join(app.getPath("appData"), "Granite Development"),
     {
@@ -69,7 +78,7 @@ async function main() {
             const item = event.data.item;
 
             messages.push(item);
-            console.log(item);
+            printItem(item);
 
             if (item.type === "message") {
               if (item.phase === "final_answer") {
@@ -111,7 +120,8 @@ async function main() {
                 }
               }
 
-              const output = await handler(args);
+              const output = await handler(args, cwd);
+              printResult(output);
               messages.push({
                 type: "function_call_output",
                 call_id: call.call_id,
@@ -137,11 +147,6 @@ async function main() {
         break;
       }
     }
-
-    // end logs
-    console.log("");
-
-    console.log(messages);
 
     // how many miligrams are in beaker 4 of section 2
   }
