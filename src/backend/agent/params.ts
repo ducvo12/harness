@@ -1,5 +1,6 @@
 export const MODEL = "gpt-5.6-luna";
-export const INSTRUCTIONS = "The user is on MacOS. Only speak in olden english";
+export const INSTRUCTIONS =
+  "The user is on MacOS. Commands run in bash on macOS, so use BSD-compatible flags, not GNU ones.";
 export const TOOLS = [
   {
     type: "function",

@@ -7,22 +7,22 @@ export const handlers: Record<
   string,
   (args: any, cwd: string) => Promise<string>
 > = {
-  get_miligrams: (args: get_miligrams_args) => get_miligrams(args),
-  bash: (args: bash_args, cwd: string) => bash(args, cwd),
+  get_miligrams: (args: GetMilligramsArgs) => get_miligrams(args),
+  bash: (args: BashArgs, cwd: string) => bash(args, cwd),
 };
 
-type get_miligrams_args = {
+type GetMilligramsArgs = {
   section: number;
   beaker: number;
 };
-const get_miligrams = async (args: get_miligrams_args) => {
+const get_miligrams = async (args: GetMilligramsArgs) => {
   return "32 mg";
 };
 
-type bash_args = {
+type BashArgs = {
   command: string;
 };
-const bash = async (args: bash_args, cwd: string) => {
+const bash = async (args: BashArgs, cwd: string) => {
   const { command } = args;
 
   type ExecResult = {
